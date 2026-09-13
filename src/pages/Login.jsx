@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { ArrowRight, CheckCircle2, Lock, LogIn, Mail } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -23,8 +23,10 @@ export default function Login() {
       const u = await login(email, password)
       if (u.role === 'superadmin' || u.role === 'admin') {
         navigate('/admin')
+      } else if (u.role === 'coach') {
+        navigate('/admin/schedule')
       } else {
-        navigate('/')
+        navigate('/schedule?mine=1')
       }
     } catch (err) {
       setError(err.message || 'Login failed. Please try again.')
@@ -34,39 +36,9 @@ export default function Login() {
   }
 
   if (user) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
-        <div className="max-w-md w-full glass-panel rounded-3xl p-8 text-center border border-slate-200 dark:border-slate-800 shadow-2xl animate-fadeIn">
-          <div className="w-16 h-16 bg-lime-400 text-slate-950 rounded-2xl mx-auto flex items-center justify-center font-black text-2xl mb-6 shadow-xl shadow-lime-400/30">
-            {user.name.charAt(0)}
-          </div>
-          <h1 className="font-heading text-3xl font-extrabold text-slate-900 dark:text-white mb-2">Welcome back, {user.name}!</h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">You are signed in as {user.email}.</p>
-          <div className="space-y-3">
-            {(user.role === 'superadmin' || user.role === 'admin' || user.role === 'coach') && (
-              <button
-                onClick={() => navigate('/admin')}
-                className="w-full py-3.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-extrabold text-sm transition-all"
-              >
-                Go to Dashboard
-              </button>
-            )}
-            <button
-              onClick={() => navigate('/book')}
-              className="w-full py-3.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-extrabold text-sm transition-all"
-            >
-              Book a Session
-            </button>
-            <button
-              onClick={logout}
-              className="w-full py-3.5 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-900 dark:text-white font-bold text-sm border border-slate-300 dark:border-slate-700 transition-all"
-            >
-              Log Out
-            </button>
-          </div>
-        </div>
-      </div>
-    )
+    if (user.role === 'superadmin' || user.role === 'admin') return <Navigate to="/admin" replace />
+    if (user.role === 'coach') return <Navigate to="/admin/schedule" replace />
+    return <Navigate to="/schedule?mine=1" replace />
   }
 
   return (

@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
 import { CheckCircle2, XCircle, Trash2, Star, MessageSquare } from 'lucide-react'
 import { api } from '../../lib/api'
+import { useAuth } from '../../context/AuthContext'
 
 export default function Comments() {
+  const { isAdmin } = useAuth()
+  const canEdit = isAdmin
   const [comments, setComments] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
@@ -84,19 +87,23 @@ export default function Comments() {
                   <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">{c.text}</p>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {c.status !== 'approved' && (
-                    <button onClick={() => handleAction(c.id, 'approve')} className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors" title="Approve">
-                      <CheckCircle2 className="w-4 h-4" />
-                    </button>
+                  {canEdit && (
+                    <>
+                      {c.status !== 'approved' && (
+                        <button onClick={() => handleAction(c.id, 'approve')} className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors" title="Approve">
+                          <CheckCircle2 className="w-4 h-4" />
+                        </button>
+                      )}
+                      {c.status !== 'rejected' && (
+                        <button onClick={() => handleAction(c.id, 'reject')} className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors" title="Reject">
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button onClick={() => handleDelete(c.id)} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors" title="Delete">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
                   )}
-                  {c.status !== 'rejected' && (
-                    <button onClick={() => handleAction(c.id, 'reject')} className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors" title="Reject">
-                      <XCircle className="w-4 h-4" />
-                    </button>
-                  )}
-                  <button onClick={() => handleDelete(c.id)} className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors" title="Delete">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
                 </div>
               </div>
             </div>

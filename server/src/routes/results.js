@@ -35,7 +35,7 @@ router.get('/:id', (req, res) => {
   }
 })
 
-router.post('/', requireRole('superadmin', 'admin', 'coach'), (req, res) => {
+router.post('/', requireRole('superadmin', 'admin'), (req, res) => {
   try {
     const { date, player_a, player_b, score_a, score_b, winner, court, competition, notes } = req.body
     if (!date || !player_a || !player_b) return res.status(400).json({ error: 'Date, player A, and player B are required' })
@@ -50,7 +50,7 @@ router.post('/', requireRole('superadmin', 'admin', 'coach'), (req, res) => {
   }
 })
 
-router.put('/:id', requireRole('superadmin', 'admin', 'coach'), (req, res) => {
+router.put('/:id', requireRole('superadmin', 'admin'), (req, res) => {
   try {
     const id = parseInt(req.params.id)
     const result = db.get('results', id)

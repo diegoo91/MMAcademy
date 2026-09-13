@@ -40,11 +40,15 @@ router.put('/:id', requireRole('superadmin', 'admin'), (req, res) => {
     const id = parseInt(req.params.id)
     const user = db.get('users', id)
     if (!user) return res.status(404).json({ error: 'User not found' })
-    const { name, email, phone, role, skill_level } = req.body
+    const { name, email, phone, role, skill_level, permissions } = req.body
     const validRoles = ['superadmin', 'admin', 'coach', 'player']
     if (role && !validRoles.includes(role)) return res.status(400).json({ error: 'Invalid role' })
     if (role && role !== user.role && user.id === req.user.id) return res.status(400).json({ error: 'Cannot change your own role' })
-    const updated = db.update('users', id, { name: name || user.name, email: email || user.email, phone: phone ?? user.phone, role: role || user.role, skill_level: skill_level || user.skill_level })
+    const updates = { name: name || user.name, email: email || user.email, phone: phone ?? user.phone, role: role || user.role, skill_level: skill_level || user.skill_level }
+    if (req.user.role === 'superadmin' && Array.isArray(permissions)) {
+      updates.permissions = permissions
+    }
+    const updated = db.update('users', id, updates)
     const { password_hash, ...safe } = updated
     res.json(safe)
   } catch (err) {

@@ -12,11 +12,12 @@ const upload = multer({ dest: join(__dirname, '..', '..', 'uploads'), limits: { 
 
 const router = Router()
 router.use(authenticate)
-router.use(requireRole('superadmin', 'admin', 'coach'))
+router.use(requireRole('superadmin', 'admin'))
 
 const TEMPLATES = {
   players: {
-    headers: ['fullName*', 'email*', 'phone', 'dob (YYYY-MM-DD)', 'skillLevel (Beginner|Intermediate|Advanced)'],
+    headers: ['fullName', 'email', 'phone', 'dob', 'skillLevel'],
+    headerLabels: ['Full Name', 'Email', 'Phone', 'DOB (YYYY-MM-DD)', 'Skill Level (Beginner|Intermediate|Advanced)'],
     validate(row) {
       const errors = []
       if (!row.fullName?.trim()) errors.push('fullName is required')
@@ -29,15 +30,18 @@ const TEMPLATES = {
     commit(rows) {
       let count = 0
       for (const r of rows) {
-        if (db.find('players', p => p.email === r.email.trim())) continue
-        db.insert('players', { full_name: r.fullName.trim(), email: r.email.trim(), phone: r.phone || '', dob: r.dob || '', skill_level: r.skillLevel || 'Intermediate', notes: '' })
+        if (!r.email?.trim()) continue
+        const existing = db.find('players', p => p.email.toLowerCase().trim() === r.email.toLowerCase().trim())
+        if (existing) continue
+        db.insert('players', { full_name: r.fullName.trim(), email: r.email.trim().toLowerCase(), phone: r.phone || '', dob: r.dob || '', skill_level: r.skillLevel || 'Intermediate', notes: '' })
         count++
       }
       return count
     }
   },
   results: {
-    headers: ['date*', 'playerA*', 'playerB*', 'scoreA', 'scoreB', 'winner', 'court (1|2)', 'competition'],
+    headers: ['date', 'playerA', 'playerB', 'scoreA', 'scoreB', 'winner', 'court', 'competition'],
+    headerLabels: ['Date', 'Player A', 'Player B', 'Score A', 'Score B', 'Winner', 'Court (1|2)', 'Competition'],
     validate(row) {
       const errors = []
       if (!row.date?.trim()) errors.push('date is required')
@@ -62,7 +66,8 @@ const TEMPLATES = {
     }
   },
   schedule: {
-    headers: ['date*', 'time (HH:MM, 15:00-22:00)*', 'court (1|2)*', 'playerText'],
+    headers: ['date', 'time', 'court', 'playerText'],
+    headerLabels: ['Date', 'Time (HH:MM)', 'Court (1|2)', 'Player Name (optional)'],
     validate(row) {
       const errors = []
       if (!row.date?.trim()) errors.push('date is required')
@@ -76,7 +81,10 @@ const TEMPLATES = {
     commit(rows) {
       let count = 0
       for (const r of rows) {
-        db.upsert('slots', ['date', 'time', 'court'], { date: r.date.trim(), time: r.time.trim(), court: parseInt(r.court), player_text: r.playerText || '', booking_id: null })
+        db.upsert('slots', ['date', 'time', 'court'], {
+          date: r.date.trim(), time: r.time.trim(), court: parseInt(r.court),
+          player_text: r.playerText || '', booking_id: null
+        })
         count++
       }
       return count
@@ -84,12 +92,16 @@ const TEMPLATES = {
   }
 }
 
+function normalizeHeader(h) {
+  return String(h).replace(/\*/g, '').replace(/\(.*?\)/g, '').replace(/_/g, ' ').trim().toLowerCase()
+}
+
 router.get('/template/:kind', (req, res) => {
   const { kind } = req.params
   const tmpl = TEMPLATES[kind]
   if (!tmpl) return res.status(404).json({ error: 'Unknown import kind' })
   const wb = XLSX.utils.book_new()
-  const ws = XLSX.utils.aoa_to_sheet([tmpl.headers])
+  const ws = XLSX.utils.aoa_to_sheet([tmpl.headerLabels || tmpl.headers])
   XLSX.utils.book_append_sheet(wb, ws, kind)
   const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
@@ -105,22 +117,37 @@ router.post('/:kind/preview', upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
     const wb = XLSX.readFile(req.file.path)
     const ws = wb.Sheets[wb.SheetNames[0]]
-    const data = XLSX.utils.sheet_to_json(ws)
+    const data = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false })
     if (data.length === 0) return res.status(400).json({ error: 'File is empty' })
     if (data.length > 1000) return res.status(400).json({ error: 'Maximum 1000 rows per import' })
 
     const aliases = {
-      fullName: ['fullName', 'full_name', 'name'], email: ['email'], phone: ['phone'],
-      dob: ['dob', 'date_of_birth', 'dateOfBirth'], skillLevel: ['skillLevel', 'skill_level', 'skill'],
-      date: ['date'], playerA: ['playerA', 'player_a', 'player1'], playerB: ['playerB', 'player_b', 'player2'],
-      scoreA: ['scoreA', 'score_a', 'score1'], scoreB: ['scoreB', 'score_b', 'score2'],
-      winner: ['winner'], court: ['court'], competition: ['competition', 'tournament'],
-      time: ['time'], playerText: ['playerText', 'player_text', 'player'],
+      fullName: ['fullName', 'full_name', 'name', 'fullname'],
+      email: ['email', 'e-mail', 'emailaddress'],
+      phone: ['phone', 'phone_number', 'phonenumber', 'mobile'],
+      dob: ['dob', 'date_of_birth', 'dateofbirth', 'birthdate', 'birth_date', 'birthday'],
+      skillLevel: ['skillLevel', 'skill_level', 'skilllevel', 'skill', 'level'],
+      date: ['date', 'gamedate', 'game_date'],
+      playerA: ['playerA', 'player_a', 'player1', 'playera', 'player1name'],
+      playerB: ['playerB', 'player_b', 'player2', 'playerb', 'player2name'],
+      scoreA: ['scoreA', 'score_a', 'score1', 'scorea'],
+      scoreB: ['scoreB', 'score_b', 'score2', 'scoreb'],
+      winner: ['winner', 'won'],
+      court: ['court', 'court_number', 'courtnumber'],
+      competition: ['competition', 'tournament', 'event', 'match'],
+      time: ['time', 'timeslot', 'time_slot', 'timeslot'],
+      playerText: ['playerText', 'player_text', 'player', 'playername', 'player_name'],
     }
+
     const keys = Object.keys(data[0])
+    const normalizedKeys = keys.map(k => normalizeHeader(k))
     const colMap = {}
+
     for (const [field, names] of Object.entries(aliases)) {
-      const found = keys.find(k => names.includes(k) || names.includes(k.toLowerCase().replace(/\s/g, '_')))
+      const found = keys.find((k, i) => {
+        const nk = normalizedKeys[i]
+        return names.includes(k) || names.includes(nk) || names.some(n => nk.includes(n))
+      })
       if (found) colMap[field] = found
     }
 
@@ -128,12 +155,23 @@ router.post('/:kind/preview', upload.single('file'), (req, res) => {
     const allErrors = []
     for (let i = 0; i < data.length; i++) {
       const mapped = {}
-      for (const [field, col] of Object.entries(colMap)) mapped[field] = data[i][col] !== undefined ? String(data[i][col]).trim() : ''
+      for (const [field, col] of Object.entries(colMap)) {
+        const val = data[i][col]
+        mapped[field] = val !== undefined && val !== null ? String(val).trim() : ''
+      }
       const errors = tmpl.validate(mapped)
       allErrors.push(errors.length ? { row: i + 2, errors } : null)
       rows.push(mapped)
     }
-    res.json({ filename: req.file.originalname, totalRows: data.length, validRows: data.length - allErrors.filter(Boolean).length, errors: allErrors.filter(Boolean), preview: rows.slice(0, 20) })
+
+    res.json({
+      filename: req.file.originalname,
+      totalRows: data.length,
+      validRows: data.length - allErrors.filter(Boolean).length,
+      errors: allErrors.filter(Boolean),
+      preview: rows.slice(0, 20),
+      allRows: rows,
+    })
   } catch (err) {
     console.error('Preview error:', err)
     res.status(500).json({ error: 'Failed to parse file' })

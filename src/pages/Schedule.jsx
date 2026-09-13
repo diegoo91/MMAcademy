@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   ArrowRight,
   Calendar as CalendarIcon,
@@ -10,8 +10,11 @@ import {
   Image as ImageIcon,
   RefreshCw,
   Sparkles,
+  User,
+  UserCheck,
 } from 'lucide-react'
 import { api } from '../lib/api'
+import { useAuth } from '../context/AuthContext'
 import { COURTS } from '../data/siteConfig'
 
 const TIME_LABELS = {
@@ -57,12 +60,29 @@ function getDayName(dateStr) {
 }
 
 export default function Schedule() {
+  const [searchParams] = useSearchParams()
+  const initialMine = searchParams.get('mine') === '1'
+  const { user } = useAuth()
+  const [mineOnly, setMineOnly] = useState(initialMine)
   const [scheduleView, setScheduleView] = useState('day')
   const [scheduleDate, setScheduleDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [showFlyerModal, setShowFlyerModal] = useState(false)
   const [slots, setSlots] = useState([])
+  const [myBookings, setMyBookings] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  const mySessionKeys = useMemo(() => {
+    const keys = new Set()
+    for (const b of myBookings) {
+      if (b.status !== 'confirmed') continue
+      try {
+        const sessions = JSON.parse(b.sessions_json || '[]')
+        for (const s of sessions) keys.add(`${s.date}|${s.time}|${s.court}`)
+      } catch {}
+    }
+    return keys
+  }, [myBookings])
 
   const fetchSlots = () => {
     setLoading(true)
@@ -82,7 +102,12 @@ export default function Schedule() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetchSlots() }, [])
+  useEffect(() => {
+    fetchSlots()
+    if (user) {
+      api.get('/bookings').then(data => setMyBookings(data.bookings || [])).catch(() => {})
+    }
+  }, [user])
 
   const slotsByDate = useMemo(() => groupSlotsByDate(slots), [slots])
 
@@ -99,14 +124,34 @@ export default function Schedule() {
 
   const currentDaySlots = useMemo(() => {
     const daySlots = slotsByDate.get(scheduleDate) || []
-    return buildDaySlots(scheduleDate, daySlots)
-  }, [scheduleDate, slotsByDate])
+    const times = [...new Set(daySlots.map(s => s.time))].sort()
+    const rows = times.map(time => {
+      const c1 = daySlots.find(s => s.time === time && s.court === 1)
+      const c2 = daySlots.find(s => s.time === time && s.court === 2)
+      return {
+        time,
+        label: TIME_LABELS[time] || time,
+        court1: c1?.player_text || '',
+        court2: c2?.player_text || '',
+      }
+    })
+    if (mineOnly && user) {
+      return rows.filter(r => mySessionKeys.has(`${scheduleDate}|${r.time}|1`) || mySessionKeys.has(`${scheduleDate}|${r.time}|2`))
+    }
+    return rows
+  }, [scheduleDate, slotsByDate, mineOnly, user, mySessionKeys])
 
   const weekTimes = useMemo(() => {
     const set = new Set()
-    for (const s of slots) set.add(s.time)
+    for (const s of slots) {
+      if (mineOnly && user) {
+        if (mySessionKeys.has(`${s.date}|${s.time}|${s.court}`)) set.add(s.time)
+      } else {
+        set.add(s.time)
+      }
+    }
     return [...set].sort()
-  }, [slots])
+  }, [slots, mineOnly, user, mySessionKeys])
 
   const weekDates = useMemo(() => {
     return availableDates.slice(0, 5)
@@ -137,9 +182,9 @@ export default function Schedule() {
         <div className="text-center space-y-3 mb-8">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-lime-400/10 border border-lime-400/30 text-lime-400 text-xs font-bold uppercase tracking-widest">
             <Flame className="w-4 h-4" />
-            <span>Official Court Availability &amp; Schedule</span>
+            <span>{mineOnly ? 'My Schedule' : 'Official Court Availability & Schedule'}</span>
           </div>
-          <h1 className="font-heading text-3xl sm:text-4xl font-black text-slate-900 dark:text-white">Academy Booking Schedule</h1>
+          <h1 className="font-heading text-3xl sm:text-4xl font-black text-slate-900 dark:text-white">{mineOnly ? 'My Upcoming Sessions' : 'Academy Booking Schedule'}</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm max-w-xl mx-auto">
             Sunday to Thursday • 3:00 PM to 11:00 PM • {COURTS} courts • All sessions 1 hour • Live from server.
           </p>
@@ -193,6 +238,26 @@ export default function Schedule() {
                 </button>
               </div>
 
+              {user && (
+                <button
+                  onClick={() => setMineOnly(v => !v)}
+                  className={`px-4 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center gap-2 border ${
+                    mineOnly
+                      ? 'bg-lime-400 text-slate-950 border-lime-400 shadow-md shadow-lime-400/20'
+                      : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-lime-400/50'
+                  }`}
+                >
+                  <UserCheck className="w-4 h-4" />
+                  <span>My Schedule</span>
+                </button>
+              )}
+              {!user && (
+                <Link to="/login" className="px-4 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center gap-2 border bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800 hover:border-lime-400/50 opacity-60">
+                  <UserCheck className="w-4 h-4" />
+                  <span>Login to view My Schedule</span>
+                </Link>
+              )}
+
               {scheduleView === 'day' && (
                 <div className="flex items-center gap-3">
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Date:</label>
@@ -232,11 +297,17 @@ export default function Schedule() {
                             <Clock className="w-3.5 h-3.5 text-lime-400 shrink-0" />
                             {slot.label}
                           </div>
-                          {[slot.court1, slot.court2].map((player, i) => (
-                            <div key={i} className={`px-4 py-3 border-l border-slate-200/60 dark:border-slate-800/60 text-xs font-bold text-center flex items-center justify-center ${player ? 'bg-rose-500/10 text-rose-300' : 'bg-lime-400/5 text-lime-400'}`}>
-                              {player || 'Available'}
-                            </div>
-                          ))}
+                          {[slot.court1, slot.court2].map((player, i) => {
+                            const courtNum = i + 1
+                            const isMine = player && mySessionKeys.has(`${scheduleDate}|${slot.time}|${courtNum}`)
+                            return (
+                              <div key={i} className={`px-4 py-3 border-l border-slate-200/60 dark:border-slate-800/60 text-xs font-bold text-center flex items-center justify-center ${
+                                isMine ? 'bg-lime-400/15 text-lime-400' : player ? 'bg-rose-500/10 text-rose-300' : 'bg-lime-400/5 text-lime-400'
+                              }`}>
+                                {player || 'Available'}{isMine ? ' ★' : ''}
+                              </div>
+                            )
+                          })}
                         </div>
                       ))}
                     </div>
@@ -266,10 +337,15 @@ export default function Schedule() {
                           const c1 = s?.player_text || ''
                           const c2 = s2?.player_text || ''
                           const empty = !c1 && !c2
+                          const isMine = mySessionKeys.has(`${date}|${time}|1`) || mySessionKeys.has(`${date}|${time}|2`)
                           return (
-                            <div key={date} className={`p-2.5 rounded-xl border text-[11px] font-bold text-center leading-snug ${empty ? 'bg-white/40 dark:bg-slate-900/40 text-slate-400 dark:text-slate-600 border-slate-200/40 dark:border-slate-800/40' : 'bg-rose-500/15 border-rose-500/40 text-rose-300'}`}>
+                            <div key={date} className={`p-2.5 rounded-xl border text-[11px] font-bold text-center leading-snug ${
+                              empty ? 'bg-white/40 dark:bg-slate-900/40 text-slate-400 dark:text-slate-600 border-slate-200/40 dark:border-slate-800/40'
+                              : isMine ? 'bg-lime-400/15 border-lime-400/40 text-lime-400'
+                              : 'bg-rose-500/15 border-rose-500/40 text-rose-300'
+                            }`}>
                               {empty ? 'Available' : (
-                                <span className="block">{c1 && c2 ? `C1: ${c1} / C2: ${c2}` : c1 ? `C1: ${c1}` : `C2: ${c2}`}</span>
+                                <span className="block">{c1 && c2 ? `C1: ${c1} / C2: ${c2}` : c1 ? `C1: ${c1}` : `C2: ${c2}`}{isMine ? ' ★' : ''}</span>
                               )}
                             </div>
                           )

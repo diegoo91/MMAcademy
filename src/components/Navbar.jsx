@@ -1,13 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Calendar, ChevronRight, LogOut, Menu, Moon, Shield, Sun, UserPlus, X } from 'lucide-react'
+import { Bell, Calendar, ChevronRight, LogOut, Menu, Moon, Palette, Shield, Sun, UserPlus, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
+import { api } from '../lib/api'
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [showThemeMenu, setShowThemeMenu] = useState(false)
+  const [notifications, setNotifications] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
   const { user, logout, openLoginModal, isAdmin, isCoach } = useAuth()
-  const { theme, toggleTheme } = useTheme()
+  const { theme, setTheme, themes, toggleTheme } = useTheme()
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -15,6 +19,7 @@ export default function Navbar() {
     { name: 'Home', path: '/' },
     ...(!user ? [{ name: 'Sign Up', path: '/signup' }] : []),
     { name: 'Schedule', path: '/schedule' },
+    ...(user && user.role === 'player' ? [{ name: 'My Schedule', path: '/schedule?mine=1' }] : []),
     { name: 'Book a Session', path: '/book' },
   ]
 
@@ -22,9 +27,17 @@ export default function Navbar() {
     navLinks.push({ name: 'Dashboard', path: '/admin' })
   }
 
+  useEffect(() => {
+    if (!user) return
+    api.get('/notifications').then(data => {
+      setNotifications(data.notifications || [])
+      setUnreadCount(data.unread || 0)
+    }).catch(() => {})
+  }, [user])
+
   const isActive = (path) => {
     if (path === '/' && location.pathname === '/') return true
-    if (path !== '/' && location.pathname.startsWith(path)) return true
+    if (path !== '/' && location.pathname.startsWith(path.split('?')[0])) return true
     return false
   }
 
@@ -32,6 +45,13 @@ export default function Navbar() {
     logout()
     setMobileMenuOpen(false)
     navigate('/')
+  }
+
+  const markAllRead = () => {
+    api.put('/notifications/read-all').then(() => {
+      setNotifications(n => n.map(x => ({ ...x, read: 1 })))
+      setUnreadCount(0)
+    }).catch(() => {})
   }
 
   return (
@@ -72,13 +92,64 @@ export default function Navbar() {
           </nav>
 
           <div className="hidden md:flex items-center gap-2">
-            <button
-              onClick={toggleTheme}
-              className="p-2.5 rounded-xl bg-white/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
-              title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            >
-              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowThemeMenu(!showThemeMenu)}
+                className="p-2.5 rounded-xl bg-white/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                title="Theme"
+              >
+                <Palette className="w-4 h-4" />
+              </button>
+              {showThemeMenu && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-2 z-50">
+                  {themes.map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => { setTheme(t.id); setShowThemeMenu(false) }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-between ${
+                        theme === t.id ? 'bg-lime-400/10 text-lime-400' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <span>{t.label}</span>
+                      {theme === t.id && <span className="w-2 h-2 rounded-full bg-lime-400" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {user && (
+              <div className="relative group">
+                <button className="relative p-2.5 rounded-xl bg-white/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
+                  <Bell className="w-4 h-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+                <div className="invisible group-hover:visible absolute right-0 top-full mt-2 w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 max-h-96 overflow-y-auto">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">Notifications</span>
+                    {unreadCount > 0 && (
+                      <button onClick={markAllRead} className="text-[10px] text-lime-400 font-semibold hover:underline">Mark all read</button>
+                    )}
+                  </div>
+                  {notifications.length === 0 ? (
+                    <p className="px-4 py-6 text-xs text-slate-400 dark:text-slate-500 text-center">No notifications</p>
+                  ) : (
+                    notifications.slice(0, 10).map(n => (
+                      <div key={n.id} className={`px-4 py-3 border-b border-slate-200/50 dark:border-slate-800/50 ${!n.read ? 'bg-lime-400/5' : ''}`}>
+                        <p className="text-xs font-bold text-slate-900 dark:text-white">{n.title}</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{n.body}</p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">{n.created_at?.slice(0, 16)}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
             {user ? (
               <div className="flex items-center gap-3 bg-white/80 dark:bg-slate-900/80 pl-3 pr-2 py-1.5 rounded-full border border-slate-200 dark:border-slate-800">
                 <Link to="/profile" className="flex items-center gap-2">
@@ -123,6 +194,18 @@ export default function Navbar() {
           </div>
 
           <div className="md:hidden flex items-center gap-2">
+            {user && (
+              <div className="relative">
+                <button className="relative p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
+                  <Bell className="w-4 h-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-rose-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+            )}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white focus:outline-none"

@@ -1,5 +1,10 @@
 import bcrypt from 'bcryptjs'
+import XLSX from 'xlsx'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
 import db from './database.js'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@mmpadel.com'
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin123!'
@@ -21,52 +26,159 @@ if (existing) {
   console.log(`Admin seeded: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD} (id=${user.id})`)
 }
 
-const demoPlayers = [
-  { full_name: 'Zain', email: 'zain@demo.com', phone: '+201000000001', skill_level: 'Intermediate' },
-  { full_name: 'Farida Fathallah', email: 'farida@demo.com', phone: '+201000000002', skill_level: 'Advanced' },
-  { full_name: 'Ahmed Saleh', email: 'ahmed@demo.com', phone: '+201000000003', skill_level: 'Beginner' },
-  { full_name: 'Hassan Medhat', email: 'hassan@demo.com', phone: '+201000000004', skill_level: 'Intermediate' },
-  { full_name: 'Totos', email: 'totos@demo.com', phone: '+201000000005', skill_level: 'Advanced' },
-  { full_name: 'Ashraf', email: 'ashraf@demo.com', phone: '+201000000006', skill_level: 'Intermediate' },
-  { full_name: 'Yasin Fathallah', email: 'yasin@demo.com', phone: '+201000000007', skill_level: 'Advanced' },
-  { full_name: 'Aley', email: 'aley@demo.com', phone: '+201000000008', skill_level: 'Intermediate' },
-  { full_name: 'Ismail', email: 'ismail@demo.com', phone: '+201000000009', skill_level: 'Beginner' },
-  { full_name: 'Sharaf', email: 'sharaf@demo.com', phone: '+201000000010', skill_level: 'Intermediate' },
-]
+const MONTH_MAP = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' }
 
-let seeded = 0
-for (const p of demoPlayers) {
-  if (!db.find('players', pl => pl.email === p.email)) {
-    db.insert('players', { ...p, dob: '', notes: '' })
-    seeded++
-  }
+function parseTimeLabel(label) {
+  const match = String(label).match(/(\d{1,2}):\d{2}[–-]/)
+  if (!match) return null
+  let hour = parseInt(match[1])
+  if (hour < 12) hour += 12
+  return `${String(hour).padStart(2, '0')}:00`
 }
-console.log(`Seeded ${seeded} demo players.`)
 
-const TODAY = new Date()
-const dow = TODAY.getDay()
-const sunday = new Date(TODAY)
-sunday.setDate(TODAY.getDate() - dow)
-function fmt(d) { return d.toISOString().slice(0, 10) }
+function parseSheetName(name) {
+  const match = name.match(/(\d{1,2})-([A-Za-z]{3})/)
+  if (!match) return null
+  const day = match[1].padStart(2, '0')
+  const month = MONTH_MAP[match[2]]
+  if (!month) return null
+  return `2026-${month}-${day}`
+}
 
-const TIMES = ['15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00']
-const allPlayerNames = db.findAll('players').map(p => p.full_name)
+const NAME_ALIASES = {
+  'farida fathala': 'Farida Fathallah',
+  'farida fathalaah': 'Farida Fathallah',
+  'yasin fathala': 'Yasin Fathallah',
+  'yassin mahmoud': 'Yasin Mahmoud',
+  'ammar abdelghany': 'Ammar Abd El Ghany',
+  'titos': 'Totos',
+  'ahmed salah': 'Ahmed Saleh',
+  'hassan': 'Hassan Medhat',
+  'zein': 'Zain',
+}
 
+function canonicalName(raw) {
+  const trimmed = raw.trim()
+  const lower = trimmed.toLowerCase()
+  return NAME_ALIASES[lower] || trimmed
+}
+
+function splitCompoundName(text) {
+  return text.split(/[/+]/).map(s => canonicalName(s.trim())).filter(Boolean)
+}
+
+function generateEmail(name) {
+  const parts = name.toLowerCase().replace(/[^a-z\s]/g, '').trim().split(/\s+/)
+  return parts.join('.') + '@mmpadel.com'
+}
+
+const EXCEL_PATH = join(__dirname, 'data', 'MM_Padel_Academy_Schedule.xlsx')
 let slotsCreated = 0
-for (let d = 0; d < 5; d++) {
-  const date = new Date(sunday)
-  date.setDate(sunday.getDate() + d)
-  const dateStr = fmt(date)
-  for (const time of TIMES) {
-    if (Math.random() > 0.4) {
-      db.insert('slots', { date: dateStr, time, court: 1, player_text: allPlayerNames[Math.floor(Math.random() * allPlayerNames.length)], booking_id: null })
-      slotsCreated++
+const allIndividualNames = new Set()
+
+db.clear('slots')
+console.log('Cleared existing slots.')
+
+try {
+  const wb = XLSX.readFile(EXCEL_PATH)
+  const processedDates = new Set()
+
+  for (const sheetName of wb.SheetNames) {
+    if (sheetName.includes('(Wed)')) {
+      const datePart = sheetName.split(' (')[0]
+      const hasTue = wb.SheetNames.some(n => n.startsWith(datePart) && n.includes('(Tue)'))
+      if (hasTue) {
+        console.log(`Skipping duplicate sheet: ${sheetName} (using Tue version)`)
+        continue
+      }
     }
-    if (Math.random() > 0.5) {
-      db.insert('slots', { date: dateStr, time, court: 2, player_text: allPlayerNames[Math.floor(Math.random() * allPlayerNames.length)], booking_id: null })
-      slotsCreated++
+
+    const dateStr = parseSheetName(sheetName)
+    if (!dateStr) {
+      console.log(`Skipping sheet "${sheetName}": could not parse date`)
+      continue
     }
+    if (processedDates.has(dateStr)) continue
+    processedDates.add(dateStr)
+
+    const ws = wb.Sheets[sheetName]
+    const data = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false })
+    if (data.length < 2) continue
+
+    const firstRowValues = Object.values(data[0]).map(v => String(v))
+    const hasCourts = firstRowValues.some(v => v.includes('Court 1'))
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i]
+      const values = Object.values(row)
+      const timeLabel = values[0]
+      if (!timeLabel || timeLabel === 'Time Slot') continue
+
+      const time = parseTimeLabel(timeLabel)
+      if (!time) continue
+
+      if (hasCourts) {
+        const court1Raw = String(values[1] || '').trim()
+        const court2Raw = String(values[2] || '').trim()
+
+        if (court1Raw && court1Raw !== 'Available') {
+          db.insert('slots', { date: dateStr, time, court: 1, player_text: court1Raw, booking_id: null })
+          slotsCreated++
+          splitCompoundName(court1Raw).forEach(n => allIndividualNames.add(n))
+        }
+        if (court2Raw && court2Raw !== 'Available') {
+          db.insert('slots', { date: dateStr, time, court: 2, player_text: court2Raw, booking_id: null })
+          slotsCreated++
+          splitCompoundName(court2Raw).forEach(n => allIndividualNames.add(n))
+        }
+      } else {
+        const playerRaw = String(values[1] || '').trim()
+        if (playerRaw && playerRaw !== 'Available') {
+          db.insert('slots', { date: dateStr, time, court: 1, player_text: playerRaw, booking_id: null })
+          slotsCreated++
+          splitCompoundName(playerRaw).forEach(n => allIndividualNames.add(n))
+        }
+      }
+    }
+    console.log(`Imported sheet: ${sheetName} → ${dateStr}`)
+  }
+} catch (err) {
+  console.error('Failed to read schedule Excel:', err.message)
+}
+
+console.log(`Seeded ${slotsCreated} schedule slots from Excel.`)
+
+db.clear('players')
+console.log('Cleared existing players.')
+
+const uniqueNames = [...allIndividualNames].sort()
+let playersCreated = 0
+for (const name of uniqueNames) {
+  const email = generateEmail(name)
+  if (db.find('players', p => p.email === email)) continue
+  db.insert('players', {
+    full_name: name,
+    email,
+    phone: '',
+    dob: '',
+    skill_level: 'Intermediate',
+    notes: '',
+  })
+  playersCreated++
+}
+console.log(`Seeded ${playersCreated} players from schedule.`)
+
+const allBookings = db.findAll('bookings')
+for (const b of allBookings) {
+  if (b.paid === undefined || b.paid === null) {
+    const isCompleted = b.status === 'completed' || b.status === 'confirmed'
+    db.update('bookings', b.id, {
+      paid: isCompleted ? 1 : 0,
+      amountPaid: isCompleted ? (Number(b.total) || 0) : 0,
+      paidAt: isCompleted ? b.updated_at : null,
+    })
   }
 }
-console.log(`Seeded ${slotsCreated} slots for this week.`)
+console.log(`Backfilled paid fields on ${allBookings.length} bookings.`)
+
 console.log('Seed complete.')

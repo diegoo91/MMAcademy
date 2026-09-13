@@ -22,7 +22,7 @@ router.get('/', optionalAuth, (req, res) => {
 
 router.use(authenticate)
 
-router.put('/:id', requireRole('superadmin', 'admin', 'coach'), (req, res) => {
+router.put('/:id', requireRole('superadmin', 'admin'), (req, res) => {
   try {
     const id = parseInt(req.params.id)
     const slot = db.get('slots', id)
@@ -36,7 +36,7 @@ router.put('/:id', requireRole('superadmin', 'admin', 'coach'), (req, res) => {
   }
 })
 
-router.post('/', requireRole('superadmin', 'admin', 'coach'), (req, res) => {
+router.post('/', requireRole('superadmin', 'admin'), (req, res) => {
   try {
     const { date, time, court, player_text } = req.body
     if (!date || !time || !court) return res.status(400).json({ error: 'Date, time, and court are required' })

@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ArrowRight, Lock, Mail, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 export default function LoginModal() {
   const { isLoginModalOpen, closeLoginModal, login } = useAuth()
+  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -21,7 +22,15 @@ export default function LoginModal() {
     }
     setLoading(true)
     try {
-      await login(email, password)
+      const u = await login(email, password)
+      closeLoginModal()
+      if (u.role === 'superadmin' || u.role === 'admin') {
+        navigate('/admin')
+      } else if (u.role === 'coach') {
+        navigate('/admin/schedule')
+      } else {
+        navigate('/schedule?mine=1')
+      }
     } catch (err) {
       setError(err.message || 'Login failed.')
     } finally {
@@ -35,7 +44,15 @@ export default function LoginModal() {
     setLoading(true)
     setError('')
     try {
-      await login('player@mmpadel.com', 'padel2026')
+      const u = await login('player@mmpadel.com', 'padel2026')
+      closeLoginModal()
+      if (u.role === 'superadmin' || u.role === 'admin') {
+        navigate('/admin')
+      } else if (u.role === 'coach') {
+        navigate('/admin/schedule')
+      } else {
+        navigate('/schedule?mine=1')
+      }
     } catch {
       setError('Demo login failed. The demo account may not exist yet.')
     } finally {

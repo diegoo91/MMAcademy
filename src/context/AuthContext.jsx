@@ -42,10 +42,15 @@ export function AuthProvider({ children }) {
   const isAdmin = user?.role === 'superadmin' || user?.role === 'admin'
   const isCoach = user?.role === 'coach' || isAdmin
   const isSuperAdmin = user?.role === 'superadmin'
+  const hasPermission = useCallback((module) => {
+    if (!user) return false
+    if (user.role === 'superadmin') return true
+    return user.permissions?.includes(module) || false
+  }, [user])
 
   return (
     <AuthContext.Provider
-      value={{ user, setUser, loading, login, signup, logout, isLoginModalOpen, openLoginModal, closeLoginModal, hasRole, isAdmin, isCoach, isSuperAdmin }}
+      value={{ user, setUser, loading, login, signup, logout, isLoginModalOpen, openLoginModal, closeLoginModal, hasRole, isAdmin, isCoach, isSuperAdmin, hasPermission }}
     >
       {children}
     </AuthContext.Provider>

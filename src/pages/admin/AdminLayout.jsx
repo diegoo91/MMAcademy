@@ -1,25 +1,29 @@
 import { useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { BarChart3, ChevronLeft, ClipboardList, FileUp, LayoutDashboard, LogOut, Menu, MessageSquare, Shield, Users, UserX, X, CalendarClock } from 'lucide-react'
+import { BarChart3, ChevronLeft, ClipboardList, DollarSign, FileUp, LayoutDashboard, LogOut, Menu, MessageSquare, PieChart, Shield, Users, UserX, X, CalendarClock } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 
-const sidebarLinks = [
-  { name: 'Dashboard', path: '/admin', icon: LayoutDashboard, exact: true },
-  { name: 'Bookings', path: '/admin/bookings', icon: ClipboardList },
-  { name: 'Schedule Manager', path: '/admin/schedule', icon: CalendarClock },
-  { name: 'Players', path: '/admin/players', icon: Users },
-  { name: 'Results', path: '/admin/results', icon: BarChart3 },
-  { name: 'Users', path: '/admin/users', icon: UserX },
-  { name: 'Imports', path: '/admin/imports', icon: FileUp },
-  { name: 'Comments', path: '/admin/comments', icon: MessageSquare },
+const ALL_SIDEBAR_LINKS = [
+  { name: 'Dashboard', path: '/admin', icon: LayoutDashboard, exact: true, roles: ['superadmin', 'admin'] },
+  { name: 'Bookings', path: '/admin/bookings', icon: ClipboardList, roles: ['superadmin', 'admin'] },
+  { name: 'Schedule Manager', path: '/admin/schedule', icon: CalendarClock, roles: ['superadmin', 'admin', 'coach'] },
+  { name: 'Players', path: '/admin/players', icon: Users, roles: ['superadmin', 'admin', 'coach'] },
+  { name: 'Results', path: '/admin/results', icon: BarChart3, roles: ['superadmin', 'admin'] },
+  { name: 'Users', path: '/admin/users', icon: UserX, roles: ['superadmin'] },
+  { name: 'Imports', path: '/admin/imports', icon: FileUp, roles: ['superadmin', 'admin'] },
+  { name: 'Comments', path: '/admin/comments', icon: MessageSquare, roles: ['superadmin', 'admin'] },
+  { name: 'Expenses', path: '/admin/expenses', icon: DollarSign, roles: ['superadmin', 'admin'] },
+  { name: 'Reports', path: '/admin/reports', icon: PieChart, roles: ['superadmin', 'admin'] },
 ]
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const { logout } = useAuth()
+  const { user, logout } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+
+  const sidebarLinks = ALL_SIDEBAR_LINKS.filter(l => l.roles.includes(user?.role))
 
   const isActive = (path, exact) => exact ? location.pathname === path : location.pathname.startsWith(path)
 
@@ -31,7 +35,9 @@ export default function AdminLayout() {
         {(!collapsed || mobileOpen) && (
           <div className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-lime-400" />
-            <span className="font-bold text-slate-900 dark:text-white text-sm">Admin Panel</span>
+            <span className="font-bold text-slate-900 dark:text-white text-sm">
+              {user?.role === 'coach' ? 'Coach Panel' : 'Admin Panel'}
+            </span>
           </div>
         )}
         <button onClick={() => mobileOpen ? setMobileOpen(false) : setSidebarOpen(!sidebarOpen)} className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
@@ -84,12 +90,10 @@ export default function AdminLayout() {
 
   return (
     <div className="flex min-h-[calc(100vh-5rem)] bg-slate-50 dark:bg-slate-950 relative">
-      {/* Desktop sidebar */}
       <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} hidden md:flex flex-col bg-white/50 dark:bg-slate-900/50 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 shrink-0`}>
         {sidebarContent(!sidebarOpen)}
       </aside>
 
-      {/* Mobile drawer */}
       {mobileOpen && (
         <>
           <div className="fixed inset-0 z-40 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-sm md:hidden" onClick={() => setMobileOpen(false)} />
@@ -104,7 +108,7 @@ export default function AdminLayout() {
           <button onClick={() => setMobileOpen(true)} className="p-2 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
             <Menu className="w-5 h-5" />
           </button>
-          <span className="text-sm font-bold text-slate-900 dark:text-white">Admin Panel</span>
+          <span className="text-sm font-bold text-slate-900 dark:text-white">{user?.role === 'coach' ? 'Coach Panel' : 'Admin Panel'}</span>
         </div>
         <Outlet />
       </main>

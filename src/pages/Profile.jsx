@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Camera, Clock, Mail, Phone, Shield, ArrowRightLeft } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Camera, Clock, Mail, Phone, Shield, ArrowRightLeft, Calendar } from 'lucide-react'
 import { api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 
@@ -50,12 +50,17 @@ export default function Profile() {
 
   const confirmedCount = bookings.filter(b => b.status === 'confirmed').length
   const pendingCount = bookings.filter(b => b.status === 'pending').length
-  const totalSessions = bookings.reduce((sum, b) => {
+  const totalSessions = bookings.filter(b => b.status === 'confirmed').reduce((sum, b) => {
     try { return sum + JSON.parse(b.sessions_json).length } catch { return sum }
   }, 0)
 
-  const totalPrivateRemaining = bookings.reduce((sum, b) => sum + (b.private_remaining || 0), 0)
-  const totalGroupRemaining = bookings.reduce((sum, b) => sum + (b.group_remaining || 0), 0)
+  const totalPrivateRemaining = bookings.filter(b => b.status === 'confirmed').reduce((sum, b) => sum + (b.private_remaining || 0), 0)
+  const totalGroupRemaining = bookings.filter(b => b.status === 'confirmed').reduce((sum, b) => sum + (b.group_remaining || 0), 0)
+  const hasCredits = totalPrivateRemaining > 0 || totalGroupRemaining > 0
+
+  const visibleBookings = user?.role === 'player'
+    ? bookings.filter(b => b.status !== 'cancelled')
+    : bookings
 
   const statusColors = {
     pending: 'bg-amber-400/20 text-amber-400',
@@ -165,7 +170,8 @@ export default function Profile() {
                 <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wider">Group Sessions</div>
               </div>
             </div>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-3 text-center">1 Private session = 2 Group sessions. Admin can convert credits.</p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-3 text-center">1 Private session = 2 Group sessions.</p>
+            <ConversionRequestButton privateRemaining={totalPrivateRemaining} groupRemaining={totalGroupRemaining} bookings={bookings} />
           </div>
         )}
 
@@ -176,11 +182,11 @@ export default function Profile() {
           </h2>
           {loading ? (
             <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-lime-400 border-t-transparent rounded-full animate-spin" /></div>
-          ) : bookings.length === 0 ? (
+          ) : visibleBookings.length === 0 ? (
             <p className="text-slate-400 dark:text-slate-500 text-sm text-center py-8">No bookings yet. <a href="/book" className="text-lime-400 font-bold hover:underline">Book a session</a></p>
           ) : (
             <div className="space-y-3">
-              {bookings.map(b => {
+              {visibleBookings.map(b => {
                 let sessionCount = 0
                 try { sessionCount = JSON.parse(b.sessions_json).length } catch {}
                 return (
@@ -200,8 +206,85 @@ export default function Profile() {
               })}
             </div>
           )}
+
+          {user?.role === 'player' && (
+            <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
+              <Link
+                to={hasCredits ? '/schedule?mine=1' : '/book'}
+                className="w-full py-3.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-extrabold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-lime-400/20"
+              >
+                <Calendar className="w-4 h-4" />
+                {hasCredits ? 'Book Session from Schedule' : 'Book a New Session'}
+              </Link>
+            </div>
+          )}
         </div>
       </div>
+    </div>
+  )
+}
+
+function ConversionRequestButton({ privateRemaining, groupRemaining, bookings }) {
+  const [open, setOpen] = useState(false)
+  const [form, setForm] = useState({ from: 'private', count: 1 })
+  const [msg, setMsg] = useState('')
+  const [sending, setSending] = useState(false)
+
+  const confirmedBooking = bookings.find(b => b.status === 'confirmed' && (b.private_remaining > 0 || b.group_remaining > 0))
+  if (!confirmedBooking) return null
+
+  const handleSubmit = async () => {
+    setSending(true)
+    setMsg('')
+    try {
+      const to = form.from === 'private' ? 'group' : 'private'
+      await api.post('/conversion-requests', { booking_id: confirmedBooking.id, from: form.from, to, count: parseInt(form.count) })
+      setMsg('Request sent! Admin will review shortly.')
+      setOpen(false)
+    } catch (err) {
+      setMsg(err.message || 'Failed to send request')
+    }
+    setSending(false)
+  }
+
+  return (
+    <div className="mt-3">
+      {!open ? (
+        <button onClick={() => setOpen(true)} className="w-full py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-purple-500/30 text-purple-400 text-xs font-bold hover:bg-purple-500/10 transition-all flex items-center justify-center gap-2">
+          <ArrowRightLeft className="w-3.5 h-3.5" /> Request Credit Conversion
+        </button>
+      ) : (
+        <div className="p-4 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-purple-500/20 space-y-3">
+          <div className="flex gap-2">
+            {privateRemaining > 0 && (
+              <button onClick={() => setForm({ ...form, from: 'private' })} className={`flex-1 py-2 rounded-lg text-xs font-bold border ${form.from === 'private' ? 'bg-purple-500 text-white border-purple-500' : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white'}`}>
+                Private → Group
+              </button>
+            )}
+            {groupRemaining >= 2 && (
+              <button onClick={() => setForm({ ...form, from: 'group' })} className={`flex-1 py-2 rounded-lg text-xs font-bold border ${form.from === 'group' ? 'bg-purple-500 text-white border-purple-500' : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white'}`}>
+                Group → Private
+              </button>
+            )}
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">
+              {form.from === 'private' ? 'Private sessions to convert' : 'Group sessions to convert (÷2)'}
+            </label>
+            <input type="number" min={1} max={form.from === 'private' ? privateRemaining : Math.floor(groupRemaining / 2)} value={form.count} onChange={e => setForm({ ...form, count: parseInt(e.target.value) || 1 })} className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs" />
+          </div>
+          <p className="text-[11px] text-center text-slate-400">
+            {form.from === 'private' ? `→ +${form.count * 2} group sessions` : `→ +${form.count} private sessions`}
+          </p>
+          <div className="flex gap-2">
+            <button onClick={() => setOpen(false)} className="flex-1 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-semibold">Cancel</button>
+            <button onClick={handleSubmit} disabled={sending} className="flex-1 py-2 rounded-lg bg-purple-500 hover:bg-purple-400 text-white text-xs font-bold disabled:opacity-50">
+              {sending ? 'Sending...' : 'Send Request'}
+            </button>
+          </div>
+        </div>
+      )}
+      {msg && <p className={`text-[11px] mt-2 text-center ${msg.includes('sent') ? 'text-emerald-400' : 'text-rose-400'}`}>{msg}</p>}
     </div>
   )
 }

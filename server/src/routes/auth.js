@@ -6,6 +6,7 @@ import { dirname, join, extname } from 'path'
 import db from '../database.js'
 import { signAccessToken, signRefreshToken, verifyRefreshToken, cookieOptions } from '../utils/tokens.js'
 import { authenticate } from '../middleware/auth.js'
+import { getUserPermissions } from '../middleware/rbac.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const profileStorage = multer.diskStorage({
@@ -41,7 +42,7 @@ router.post('/login', (req, res) => {
     if (!email || !password) return res.status(400).json({ error: 'Email and password are required' })
     const user = db.find('users', u => u.email === email)
     if (!user || !bcrypt.compareSync(password, user.password_hash)) return res.status(401).json({ error: 'Invalid email or password' })
-    const safe = { id: user.id, name: user.name, email: user.email, role: user.role, skill_level: user.skill_level, force_password_change: user.force_password_change }
+    const safe = { id: user.id, name: user.name, email: user.email, role: user.role, skill_level: user.skill_level, force_password_change: user.force_password_change, permissions: getUserPermissions(user) }
     const accessToken = signAccessToken(safe)
     const refreshToken = signRefreshToken(safe)
     res.cookie('refreshToken', refreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000))
@@ -59,7 +60,7 @@ router.post('/refresh', (req, res) => {
     const payload = verifyRefreshToken(token)
     const user = db.get('users', payload.id)
     if (!user) return res.status(401).json({ error: 'User not found' })
-    const safe = { id: user.id, name: user.name, email: user.email, role: user.role, skill_level: user.skill_level, force_password_change: user.force_password_change }
+    const safe = { id: user.id, name: user.name, email: user.email, role: user.role, skill_level: user.skill_level, force_password_change: user.force_password_change, permissions: getUserPermissions(user) }
     const accessToken = signAccessToken(safe)
     const newRefresh = signRefreshToken(safe)
     res.cookie('refreshToken', newRefresh, cookieOptions(7 * 24 * 60 * 60 * 1000))
@@ -75,7 +76,9 @@ router.post('/logout', (req, res) => {
 })
 
 router.get('/me', authenticate, (req, res) => {
-  res.json({ user: req.user })
+  const user = db.get('users', req.user.id)
+  const permissions = user ? getUserPermissions(user) : []
+  res.json({ user: { ...req.user, permissions } })
 })
 
 router.post('/change-password', authenticate, (req, res) => {

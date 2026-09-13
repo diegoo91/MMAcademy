@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { AlertCircle, CheckCircle2, Download, Edit, FileUp, Plus, Search, Trash2, Upload, X } from 'lucide-react'
 import { api, downloadFile } from '../../lib/api'
+import { useAuth } from '../../context/AuthContext'
 
 function ResultModal({ result, onClose, onSave }) {
   const [form, setForm] = useState({
@@ -229,6 +230,8 @@ function ImportModal({ kind, onClose, onDone }) {
 }
 
 export default function Results() {
+  const { isAdmin } = useAuth()
+  const canEdit = isAdmin
   const [results, setResults] = useState([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -261,12 +264,16 @@ export default function Results() {
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">{total} total match results</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setShowImport(true)} className="px-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-semibold flex items-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-800">
-            <Upload className="w-4 h-4" /> Import Excel
-          </button>
-          <button onClick={() => setShowAdd(true)} className="px-4 py-2.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 text-sm font-bold flex items-center gap-2">
-            <Plus className="w-4 h-4" /> Add Result
-          </button>
+          {canEdit && (
+            <>
+              <button onClick={() => setShowImport(true)} className="px-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-semibold flex items-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-800">
+                <Upload className="w-4 h-4" /> Import Excel
+              </button>
+              <button onClick={() => setShowAdd(true)} className="px-4 py-2.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 text-sm font-bold flex items-center gap-2">
+                <Plus className="w-4 h-4" /> Add Result
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -314,8 +321,12 @@ export default function Results() {
                     <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs">{r.competition || '-'}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => setEditResult(r)} className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg"><Edit className="w-4 h-4" /></button>
-                        <button onClick={() => setDeleteConfirm(r)} className="p-2 text-slate-500 dark:text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                        {canEdit && (
+                          <>
+                            <button onClick={() => setEditResult(r)} className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg"><Edit className="w-4 h-4" /></button>
+                            <button onClick={() => setDeleteConfirm(r)} className="p-2 text-slate-500 dark:text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

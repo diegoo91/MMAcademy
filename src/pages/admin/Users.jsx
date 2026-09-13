@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react'
 import { AlertCircle, CheckCircle2, Edit, Key, Plus, Shield, Trash2, X } from 'lucide-react'
 import { api } from '../../lib/api'
 
+const ALL_MODULES = ['dashboard', 'bookings', 'schedule', 'players', 'results', 'users', 'imports', 'comments', 'conversions']
+
 function UserModal({ user, onClose, onSave }) {
   const [form, setForm] = useState({
     name: user?.name || '',
     email: user?.email || '',
     phone: user?.phone || '',
     role: user?.role || 'player',
+    permissions: user?.permissions || [],
     password: '',
   })
   const [loading, setLoading] = useState(false)
@@ -19,7 +22,7 @@ function UserModal({ user, onClose, onSave }) {
     setError('')
     try {
       if (user) {
-        const updates = { name: form.name, email: form.email, phone: form.phone, role: form.role }
+        const updates = { name: form.name, email: form.email, phone: form.phone, role: form.role, permissions: form.permissions }
         await api.put(`/users/${user.id}`, updates)
       } else {
         if (!form.password) { setError('Password is required for new users'); setLoading(false); return }
@@ -33,9 +36,16 @@ function UserModal({ user, onClose, onSave }) {
     }
   }
 
+  const togglePermission = (mod) => {
+    setForm(f => ({
+      ...f,
+      permissions: f.permissions.includes(mod) ? f.permissions.filter(p => p !== mod) : [...f.permissions, mod]
+    }))
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md">
-      <div className="w-full max-w-lg glass-panel rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6">
+      <div className="w-full max-w-lg glass-panel rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-bold text-slate-900 dark:text-white">{user ? 'Edit User' : 'Create User'}</h3>
           <button onClick={onClose} className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg"><X className="w-5 h-5" /></button>
@@ -67,6 +77,22 @@ function UserModal({ user, onClose, onSave }) {
               </select>
             </div>
           </div>
+          {(form.role === 'admin' || form.role === 'coach') && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">Module Access</label>
+              <div className="grid grid-cols-3 gap-2">
+                {ALL_MODULES.map(mod => (
+                  <button key={mod} type="button" onClick={() => togglePermission(mod)} className={`px-3 py-2 rounded-lg text-xs font-bold border transition-all ${
+                    form.permissions.includes(mod)
+                      ? 'bg-lime-400/10 text-lime-400 border-lime-400/40'
+                      : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-700'
+                  }`}>
+                    {mod}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {!user && (
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Password *</label>

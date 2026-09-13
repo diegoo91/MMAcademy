@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { AlertCircle, CheckCircle2, Download, Edit, FileUp, Plus, Search, Trash2, Upload, X } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Download, Edit, FileUp, History, Plus, Search, Trash2, Upload, X } from 'lucide-react'
 import { api, downloadFile } from '../../lib/api'
+import { useAuth } from '../../context/AuthContext'
 
 function PlayerModal({ player, onClose, onSave }) {
   const [form, setForm] = useState({
@@ -222,7 +223,68 @@ function ImportModal({ kind, onClose, onDone }) {
   )
 }
 
+function PlayerHistoryModal({ player, onClose }) {
+  const [sessions, setSessions] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    api.get(`/players/${player.id}/sessions`).then(data => setSessions(data.sessions || [])).catch(() => {}).finally(() => setLoading(false))
+  }, [player.id])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+      <div className="w-full max-w-2xl glass-panel rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-lime-400/20 text-lime-400 flex items-center justify-center font-bold text-sm">{player.full_name.charAt(0)}</div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">{player.full_name} — Session History</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{sessions.length} sessions total</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg"><X className="w-5 h-5" /></button>
+        </div>
+        {loading ? (
+          <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-lime-400 border-t-transparent rounded-full animate-spin" /></div>
+        ) : sessions.length === 0 ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-8">No sessions found for this player.</p>
+        ) : (
+          <div className="overflow-y-auto flex-1">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-white dark:bg-slate-900">
+                <tr className="text-slate-500 dark:text-slate-400 uppercase">
+                  <th className="text-left px-3 py-2 font-semibold">Date</th>
+                  <th className="text-left px-3 py-2 font-semibold">Time</th>
+                  <th className="text-left px-3 py-2 font-semibold">Court</th>
+                  <th className="text-left px-3 py-2 font-semibold">Type</th>
+                  <th className="text-center px-3 py-2 font-semibold">Paid</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200/60 dark:divide-slate-800/60">
+                {sessions.map((s, i) => (
+                  <tr key={i} className="text-slate-700 dark:text-slate-300">
+                    <td className="px-3 py-2.5">{s.date}</td>
+                    <td className="px-3 py-2.5 font-mono">{s.time}</td>
+                    <td className="px-3 py-2.5">Court {s.court}</td>
+                    <td className="px-3 py-2.5"><span className="text-[10px] font-bold uppercase">{s.session_type || '-'}</span></td>
+                    <td className="px-3 py-2.5 text-center">
+                      {s.paid ? <span className="px-2 py-0.5 rounded-full bg-emerald-400/15 text-emerald-400 text-[10px] font-bold">Paid</span> : <span className="text-slate-400">-</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <button onClick={onClose} className="mt-4 w-full py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-semibold text-sm">Close</button>
+      </div>
+    </div>
+  )
+}
+
 export default function Players() {
+  const { isAdmin } = useAuth()
+  const canEdit = isAdmin
   const [players, setPlayers] = useState([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -233,6 +295,7 @@ export default function Players() {
   const [showAdd, setShowAdd] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [historyPlayer, setHistoryPlayer] = useState(null)
 
   const fetchPlayers = () => {
     setLoading(true)
@@ -264,12 +327,16 @@ export default function Players() {
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">{total} total players</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setShowImport(true)} className="px-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-semibold flex items-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-800">
-            <Upload className="w-4 h-4" /> Import Excel
-          </button>
-          <button onClick={() => setShowAdd(true)} className="px-4 py-2.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 text-sm font-bold flex items-center gap-2">
-            <Plus className="w-4 h-4" /> Add Player
-          </button>
+          {canEdit && (
+            <>
+              <button onClick={() => setShowImport(true)} className="px-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-semibold flex items-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-800">
+                <Upload className="w-4 h-4" /> Import Excel
+              </button>
+              <button onClick={() => setShowAdd(true)} className="px-4 py-2.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 text-sm font-bold flex items-center gap-2">
+                <Plus className="w-4 h-4" /> Add Player
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -303,6 +370,7 @@ export default function Players() {
                   <th className="text-left px-6 py-4 font-semibold">Email</th>
                   <th className="text-left px-6 py-4 font-semibold">Phone</th>
                   <th className="text-left px-6 py-4 font-semibold">Skill</th>
+                  <th className="text-center px-6 py-4 font-semibold">Sessions</th>
                   <th className="text-left px-6 py-4 font-semibold">Joined</th>
                   <th className="text-right px-6 py-4 font-semibold">Actions</th>
                 </tr>
@@ -323,11 +391,23 @@ export default function Players() {
                         {p.skill_level}
                       </span>
                     </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-full text-xs font-bold ${
+                        (p.remaining_sessions || 0) > 0 ? 'bg-lime-400/15 text-lime-400' : 'bg-slate-200/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500'
+                      }`}>
+                        {p.remaining_sessions || 0}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs">{new Date(p.created_at).toLocaleDateString()}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => setEditPlayer(p)} className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors"><Edit className="w-4 h-4" /></button>
-                        <button onClick={() => setDeleteConfirm(p)} className="p-2 text-slate-500 dark:text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                        <button onClick={() => setHistoryPlayer(p)} title="View Sessions" className="p-2 text-slate-500 dark:text-slate-400 hover:text-lime-400 hover:bg-lime-400/10 rounded-lg transition-colors"><History className="w-4 h-4" /></button>
+                        {canEdit && (
+                          <>
+                            <button onClick={() => setEditPlayer(p)} className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors"><Edit className="w-4 h-4" /></button>
+                            <button onClick={() => setDeleteConfirm(p)} className="p-2 text-slate-500 dark:text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -348,6 +428,7 @@ export default function Players() {
 
       {(showAdd || editPlayer) && <PlayerModal player={editPlayer} onClose={() => { setShowAdd(false); setEditPlayer(null) }} onSave={() => { setShowAdd(false); setEditPlayer(null); fetchPlayers() }} />}
       {showImport && <ImportModal kind="players" onClose={() => setShowImport(false)} onDone={() => { setShowImport(false); fetchPlayers() }} />}
+      {historyPlayer && <PlayerHistoryModal player={historyPlayer} onClose={() => setHistoryPlayer(null)} />}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md">
           <div className="w-full max-w-sm glass-panel rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 text-center">

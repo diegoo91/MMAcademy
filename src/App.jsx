@@ -18,6 +18,8 @@ import Imports from './pages/admin/Imports'
 import Bookings from './pages/admin/Bookings'
 import Comments from './pages/admin/Comments'
 import ScheduleManager from './pages/admin/ScheduleManager'
+import Expenses from './pages/admin/Expenses'
+import Reports from './pages/admin/Reports'
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth()
@@ -54,21 +56,46 @@ function AppRoutes() {
             <AdminLayout />
           </ProtectedRoute>
         }>
-          <Route index element={<Dashboard />} />
-          <Route path="bookings" element={<Bookings />} />
+          <Route index element={
+            <ProtectedRoute roles={['superadmin', 'admin']}>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="bookings" element={
+            <ProtectedRoute roles={['superadmin', 'admin']}>
+              <Bookings />
+            </ProtectedRoute>
+          } />
           <Route path="schedule" element={<ScheduleManager />} />
           <Route path="players" element={<Players />} />
-          <Route path="results" element={<Results />} />
-          <Route path="users" element={
+          <Route path="results" element={
             <ProtectedRoute roles={['superadmin', 'admin']}>
+              <Results />
+            </ProtectedRoute>
+          } />
+          <Route path="users" element={
+            <ProtectedRoute roles={['superadmin']}>
               <Users />
             </ProtectedRoute>
           } />
-          <Route path="imports" element={<Imports />} />
-          <Route path="bookings" element={<Bookings />} />
+          <Route path="imports" element={
+            <ProtectedRoute roles={['superadmin', 'admin']}>
+              <Imports />
+            </ProtectedRoute>
+          } />
           <Route path="comments" element={
             <ProtectedRoute roles={['superadmin', 'admin']}>
               <Comments />
+            </ProtectedRoute>
+          } />
+          <Route path="expenses" element={
+            <ProtectedRoute roles={['superadmin', 'admin']}>
+              <Expenses />
+            </ProtectedRoute>
+          } />
+          <Route path="reports" element={
+            <ProtectedRoute roles={['superadmin', 'admin']}>
+              <Reports />
             </ProtectedRoute>
           } />
         </Route>

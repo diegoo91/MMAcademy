@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Calendar as CalendarIcon, Clock, Plus, Trash2, X } from 'lucide-react'
-import { api } from '../../lib/api'
+import { Calendar as CalendarIcon, Check, Clock, Download, FileSpreadsheet, Plus, Trash2, Upload, X } from 'lucide-react'
+import { api, downloadFile } from '../../lib/api'
+import { useAuth } from '../../context/AuthContext'
 
 const TIME_LABELS = {
   '14:00': '2:00–3:00', '15:00': '3:00–4:00', '16:00': '4:00–5:00',
@@ -15,6 +16,9 @@ function formatDateShort(d) { const [,m,day] = d.split('-'); return `${Number(da
 function getDayName(d) { return DAY_NAMES[new Date(d + 'T00:00:00').getDay()] }
 
 export default function ScheduleManager() {
+  const { isAdmin } = useAuth()
+  const canEdit = isAdmin
+  const [activeTab, setActiveTab] = useState('schedule')
   const [view, setView] = useState('day')
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [slots, setSlots] = useState([])
@@ -22,6 +26,12 @@ export default function ScheduleManager() {
   const [editSlot, setEditSlot] = useState(null)
   const [addSlot, setAddSlot] = useState(null)
   const [addForm, setAddForm] = useState({ date: '', time: '15:00', court: 1, player_text: '' })
+  const [conversionRequests, setConversionRequests] = useState([])
+  const [convLoading, setConvLoading] = useState(false)
+  const [importPreview, setImportPreview] = useState(null)
+  const [importFile, setImportFile] = useState(null)
+  const [importing, setImporting] = useState(false)
+  const [uploadMessage, setUploadMessage] = useState(null)
 
   const fetchSlots = () => {
     setLoading(true)
@@ -36,7 +46,12 @@ export default function ScheduleManager() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetchSlots() }, [])
+  const fetchConversionRequests = () => {
+    setConvLoading(true)
+    api.get('/conversion-requests').then(setConversionRequests).catch(() => {}).finally(() => setConvLoading(false))
+  }
+
+  useEffect(() => { fetchSlots(); fetchConversionRequests() }, [])
 
   const slotsByDate = useMemo(() => {
     const map = new Map()
@@ -78,122 +93,280 @@ export default function ScheduleManager() {
     } catch {}
   }
 
+  const handleConvertAction = async (id, action) => {
+    try {
+      await api.put(`/conversion-requests/${id}/${action}`)
+      fetchConversionRequests()
+    } catch {}
+  }
+
+  const handleUploadFile = async () => {
+    if (!importFile) return
+    setImporting(true)
+    setUploadMessage(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', importFile)
+      const preview = await api.upload('/imports/schedule/preview', fd)
+      setImportPreview(preview)
+      setUploadMessage(null)
+    } catch (err) {
+      setUploadMessage({ type: 'error', text: err.message || 'Upload failed. Please try again.' })
+      setImportPreview(null)
+    }
+    setImporting(false)
+  }
+
+  const handleCommitImport = async () => {
+    if (!importPreview) return
+    try {
+      const result = await api.post('/imports/schedule/commit', { rows: importPreview.allRows || importPreview.preview, filename: importPreview.filename })
+      setUploadMessage({ type: 'success', text: `Imported ${result.inserted} time slots from ${importPreview.filename || 'file'}.` })
+      setImportPreview(null)
+      setImportFile(null)
+      fetchSlots()
+      setActiveTab('schedule')
+    } catch (err) {
+      setUploadMessage({ type: 'error', text: err.message || 'Commit failed. Please try again.' })
+    }
+  }
+
+  const pendingConversions = conversionRequests.filter(r => r.status === 'pending')
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-3xl font-black text-slate-900 dark:text-white">Schedule Manager</h1>
-        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Edit, add, or delete court slots</p>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Manage slots, upload schedules, and conversion requests</p>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800">
-          <button onClick={() => setView('day')} className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center gap-2 ${view === 'day' ? 'bg-lime-400 text-slate-950 shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>
-            <CalendarIcon className="w-4 h-4" /><span>Day View</span>
+      <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 w-fit">
+        {[
+          { id: 'schedule', label: 'Schedule', icon: CalendarIcon },
+          { id: 'upload', label: 'Upload', icon: Upload },
+          { id: 'conversions', label: `Conversions${pendingConversions.length > 0 ? ` (${pendingConversions.length})` : ''}`, icon: FileSpreadsheet },
+        ].map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center gap-2 ${activeTab === tab.id ? 'bg-lime-400 text-slate-950 shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>
+            <tab.icon className="w-4 h-4" /><span>{tab.label}</span>
           </button>
-          <button onClick={() => setView('week')} className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center gap-2 ${view === 'week' ? 'bg-lime-400 text-slate-950 shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>
-            <CalendarIcon className="w-4 h-4" /><span>Week View</span>
-          </button>
-        </div>
-        <div className="flex gap-2 items-center">
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} className="px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-bold focus:outline-none focus:border-lime-400" />
-          <button onClick={() => { setAddSlot(true); setAddForm({ ...addForm, date }) }} className="px-4 py-2 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 text-xs font-bold flex items-center gap-1">
-            <Plus className="w-4 h-4" /> Add Slot
-          </button>
-        </div>
+        ))}
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-16"><div className="w-8 h-8 border-2 border-lime-400 border-t-transparent rounded-full animate-spin" /></div>
-      ) : view === 'day' ? (
-        <div className="glass-panel rounded-3xl p-6 border border-slate-200 dark:border-slate-800">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
-            <h3 className="font-heading font-extrabold text-slate-900 dark:text-white text-lg">{getDayName(date)} {formatDateShort(date)}</h3>
-            <span className="text-xs text-lime-400 font-bold bg-lime-400/10 px-3 py-1 rounded-full border border-lime-400/30">2 Courts</span>
+      {activeTab === 'schedule' && (
+        <>
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+            <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800">
+              <button onClick={() => setView('day')} className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center gap-2 ${view === 'day' ? 'bg-lime-400 text-slate-950 shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>
+                <CalendarIcon className="w-4 h-4" /><span>Day View</span>
+              </button>
+              <button onClick={() => setView('week')} className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center gap-2 ${view === 'week' ? 'bg-lime-400 text-slate-950 shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>
+                <CalendarIcon className="w-4 h-4" /><span>Week View</span>
+              </button>
+            </div>
+            <div className="flex gap-2 items-center">
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className="px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-bold focus:outline-none focus:border-lime-400" />
+              {canEdit && (
+                <button onClick={() => { setAddSlot(true); setAddForm({ ...addForm, date }) }} className="px-4 py-2 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 text-xs font-bold flex items-center gap-1">
+                  <Plus className="w-4 h-4" /> Add Slot
+                </button>
+              )}
+            </div>
           </div>
-          {currentDaySlots.length === 0 ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400 py-8 text-center">No slots for this date.</p>
-          ) : (
-            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
-              <div className="min-w-[320px]">
-                <div className="grid grid-cols-4 bg-slate-100/80 dark:bg-slate-900/80 text-center">
-                  <div className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-left">Time</div>
-                  <div className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-lime-400 border-l border-slate-200 dark:border-slate-800">Court 1</div>
-                  <div className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-lime-400 border-l border-slate-200 dark:border-slate-800">Court 2</div>
-                  <div className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-l border-slate-200 dark:border-slate-800">Actions</div>
-                </div>
-                <div className="divide-y divide-slate-200/60 dark:divide-slate-800/60">
-                  {currentDaySlots.map((row) => (
-                    <div key={row.time} className="grid grid-cols-4 items-stretch text-sm">
-                      <div className="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono text-xs flex items-center gap-1.5 bg-slate-50/40 dark:bg-slate-900/40">
-                        <Clock className="w-3.5 h-3.5 text-lime-400 shrink-0" />
-                        {row.label}
-                      </div>
-                      {[row.slot1, row.slot2].map((slot, i) => (
-                        <div key={i} className={`px-4 py-3 border-l border-slate-200/60 dark:border-slate-800/60 text-xs font-bold text-center flex items-center justify-center gap-2 ${slot ? 'bg-rose-500/10 text-rose-300' : 'bg-lime-400/5 text-lime-400'}`}>
-                          {slot ? (
-                            <>
-                              <span className="truncate">{slot.player_text}</span>
-                              <div className="flex gap-1 shrink-0">
-                                <button onClick={() => setEditSlot(slot)} className="p-0.5 text-slate-400 hover:text-blue-400" title="Edit"><CalendarIcon className="w-3 h-3" /></button>
-                                <button onClick={() => handleDeleteSlot(slot.id)} className="p-0.5 text-slate-400 hover:text-rose-400" title="Delete"><Trash2 className="w-3 h-3" /></button>
-                              </div>
-                            </>
-                          ) : 'Available'}
+
+          {loading ? (
+            <div className="flex justify-center py-16"><div className="w-8 h-8 border-2 border-lime-400 border-t-transparent rounded-full animate-spin" /></div>
+          ) : view === 'day' ? (
+            <div className="glass-panel rounded-3xl p-6 border border-slate-200 dark:border-slate-800">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
+                <h3 className="font-heading font-extrabold text-slate-900 dark:text-white text-lg">{getDayName(date)} {formatDateShort(date)}</h3>
+                <span className="text-xs text-lime-400 font-bold bg-lime-400/10 px-3 py-1 rounded-full border border-lime-400/30">2 Courts</span>
+              </div>
+              {currentDaySlots.length === 0 ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400 py-8 text-center">No slots for this date.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+                  <div className="min-w-[320px]">
+                    <div className="grid grid-cols-4 bg-slate-100/80 dark:bg-slate-900/80 text-center">
+                      <div className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-left">Time</div>
+                      <div className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-lime-400 border-l border-slate-200 dark:border-slate-800">Court 1</div>
+                      <div className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-lime-400 border-l border-slate-200 dark:border-slate-800">Court 2</div>
+                      <div className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-l border-slate-200 dark:border-slate-800">Actions</div>
+                    </div>
+                    <div className="divide-y divide-slate-200/60 dark:divide-slate-800/60">
+                      {currentDaySlots.map((row) => (
+                        <div key={row.time} className="grid grid-cols-4 items-stretch text-sm">
+                          <div className="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono text-xs flex items-center gap-1.5 bg-slate-50/40 dark:bg-slate-900/40">
+                            <Clock className="w-3.5 h-3.5 text-lime-400 shrink-0" />
+                            {row.label}
+                          </div>
+                           {[row.slot1, row.slot2].map((slot, i) => (
+                            <div key={i} className={`px-4 py-3 border-l border-slate-200/60 dark:border-slate-800/60 text-xs font-bold text-center flex items-center justify-center gap-2 ${slot ? 'bg-rose-500/10 text-rose-300' : 'bg-lime-400/5 text-lime-400'}`}>
+                              {slot ? (
+                                <>
+                                  <span className="truncate">{slot.player_text}</span>
+                                  {canEdit && (
+                                    <div className="flex gap-1 shrink-0">
+                                      <button onClick={() => setEditSlot(slot)} className="p-0.5 text-slate-400 hover:text-blue-400" title="Edit"><CalendarIcon className="w-3 h-3" /></button>
+                                      <button onClick={() => handleDeleteSlot(slot.id)} className="p-0.5 text-slate-400 hover:text-rose-400" title="Delete"><Trash2 className="w-3 h-3" /></button>
+                                    </div>
+                                  )}
+                                </>
+                              ) : 'Available'}
+                            </div>
+                          ))}
+                          <div className="px-2 py-3 border-l border-slate-200/60 dark:border-slate-800/60 flex items-center justify-center gap-1">
+                            {[1, 2].map(court => {
+                              const exists = court === 1 ? row.slot1 : row.slot2
+                              if (exists) return null
+                              if (!canEdit) return null
+                              return (
+                                <button key={court} onClick={() => { setAddSlot(true); setAddForm({ ...addForm, date, time: row.time, court }) }} className="px-2 py-1 text-[10px] font-bold rounded bg-lime-400/10 text-lime-400 hover:bg-lime-400/20 border border-lime-400/30">
+                                  +C{court}
+                                </button>
+                              )
+                            })}
+                          </div>
                         </div>
                       ))}
-                      <div className="px-2 py-3 border-l border-slate-200/60 dark:border-slate-800/60 flex items-center justify-center gap-1">
-                        {[1, 2].map(court => {
-                          const exists = court === 1 ? row.slot1 : row.slot2
-                          if (exists) return null
-                          return (
-                            <button key={court} onClick={() => { setAddSlot(true); setAddForm({ ...addForm, date, time: row.time, court }) }} className="px-2 py-1 text-[10px] font-bold rounded bg-lime-400/10 text-lime-400 hover:bg-lime-400/20 border border-lime-400/30">
-                              +C{court}
-                            </button>
-                          )
-                        })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="glass-panel rounded-3xl p-6 border border-slate-200 dark:border-slate-800 overflow-x-auto">
+              <div className="min-w-[850px]">
+                <div className="grid grid-cols-6 gap-3 pb-4 border-b border-slate-200 dark:border-slate-800 text-center font-heading text-sm font-extrabold text-slate-900 dark:text-white">
+                  <div className="text-left text-slate-500 dark:text-slate-400 text-xs uppercase">Time</div>
+                  {weekDates.map(d => (
+                    <div key={d} className="text-lime-400 text-xs">{getDayName(d)} ({formatDateShort(d)})</div>
+                  ))}
+                </div>
+                <div className="divide-y divide-slate-200/60 dark:divide-slate-800/60 pt-2 space-y-2">
+                  {weekTimes.map(time => (
+                    <div key={time} className="grid grid-cols-6 gap-3 py-2 items-center text-xs">
+                      <div className="font-bold text-slate-900 dark:text-white font-mono flex items-center gap-1.5 text-[11px]">
+                        <Clock className="w-3.5 h-3.5 text-lime-400" />
+                        <span>{TIME_LABELS[time] || time}</span>
                       </div>
+                      {weekDates.map(d => {
+                        const daySlots = slotsByDate.get(d) || []
+                        const s1 = daySlots.find(x => x.time === time && x.court === 1)
+                        const s2 = daySlots.find(x => x.time === time && x.court === 2)
+                        const empty = !s1 && !s2
+                        return (
+                           <div key={d} className={`p-2.5 rounded-xl border text-[11px] font-bold text-center leading-snug ${empty ? 'bg-slate-50/40 dark:bg-slate-900/40 text-slate-400 dark:text-slate-600 border-slate-200/40 dark:border-slate-800/40' : 'bg-rose-500/15 border-rose-500/40 text-rose-300'}`}>
+                            {empty ? (
+                              canEdit ? <button onClick={() => { setAddSlot(true); setAddForm({ ...addForm, date: d, time }) }} className="text-lime-400 hover:underline">+ Add</button> : 'Available'
+                            ) : (
+                              <span className="block">{s1 && s2 ? `C1: ${s1.player_text} / C2: ${s2.player_text}` : s1 ? `C1: ${s1.player_text}` : `C2: ${s2.player_text}`}</span>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   ))}
                 </div>
               </div>
             </div>
           )}
-        </div>
-      ) : (
-        <div className="glass-panel rounded-3xl p-6 border border-slate-200 dark:border-slate-800 overflow-x-auto">
-          <div className="min-w-[850px]">
-            <div className="grid grid-cols-6 gap-3 pb-4 border-b border-slate-200 dark:border-slate-800 text-center font-heading text-sm font-extrabold text-slate-900 dark:text-white">
-              <div className="text-left text-slate-500 dark:text-slate-400 text-xs uppercase">Time</div>
-              {weekDates.map(d => (
-                <div key={d} className="text-lime-400 text-xs">{getDayName(d)} ({formatDateShort(d)})</div>
-              ))}
+        </>
+      )}
+
+      {activeTab === 'upload' && (
+        <div className="glass-panel rounded-3xl p-6 border border-slate-200 dark:border-slate-800">
+          <h3 className="font-heading font-extrabold text-slate-900 dark:text-white text-lg mb-4">Upload Schedule</h3>
+          <div className="space-y-4">
+            {uploadMessage && (
+              <div className={`p-3 rounded-xl text-sm font-semibold ${
+                uploadMessage.type === 'success'
+                  ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                  : 'bg-rose-500/10 border border-rose-500/30 text-rose-400'
+              }`}>
+                {uploadMessage.text}
+              </div>
+            )}
+            <button onClick={async () => {
+              try {
+                const blob = await downloadFile('/imports/template/schedule')
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = 'schedule_import_template.xlsx'
+                a.click()
+                URL.revokeObjectURL(url)
+              } catch {}
+            }} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
+              <Download className="w-4 h-4" /> Download Template
+            </button>
+            <div className="flex items-center gap-3">
+              <input type="file" accept=".xlsx,.xls,.csv" onChange={e => setImportFile(e.target.files?.[0])} className="text-xs text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-lime-400 file:text-slate-950 file:cursor-pointer" />
+              <button onClick={handleUploadFile} disabled={!importFile || importing} className="px-4 py-2 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 text-xs font-bold disabled:opacity-50">
+                {importing ? 'Uploading...' : 'Preview'}
+              </button>
             </div>
-            <div className="divide-y divide-slate-200/60 dark:divide-slate-800/60 pt-2 space-y-2">
-              {weekTimes.map(time => (
-                <div key={time} className="grid grid-cols-6 gap-3 py-2 items-center text-xs">
-                  <div className="font-bold text-slate-900 dark:text-white font-mono flex items-center gap-1.5 text-[11px]">
-                    <Clock className="w-3.5 h-3.5 text-lime-400" />
-                    <span>{TIME_LABELS[time] || time}</span>
+            {importPreview && (
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center gap-4 text-xs">
+                  <span className="text-slate-500 dark:text-slate-400">Total: <strong className="text-slate-900 dark:text-white">{importPreview.totalRows}</strong></span>
+                  <span className="text-emerald-400">Valid: <strong>{importPreview.validRows}</strong></span>
+                  {importPreview.errors.length > 0 && <span className="text-rose-400">Errors: <strong>{importPreview.errors.length}</strong></span>}
+                </div>
+                {importPreview.errors.length > 0 && (
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {importPreview.errors.slice(0, 10).map((e, i) => (
+                      <p key={i} className="text-[11px] text-rose-400">Row {e.row}: {e.errors.join(', ')}</p>
+                    ))}
                   </div>
-                  {weekDates.map(d => {
-                    const daySlots = slotsByDate.get(d) || []
-                    const s1 = daySlots.find(x => x.time === time && x.court === 1)
-                    const s2 = daySlots.find(x => x.time === time && x.court === 2)
-                    const empty = !s1 && !s2
-                    return (
-                      <div key={d} className={`p-2.5 rounded-xl border text-[11px] font-bold text-center leading-snug ${empty ? 'bg-slate-50/40 dark:bg-slate-900/40 text-slate-400 dark:text-slate-600 border-slate-200/40 dark:border-slate-800/40' : 'bg-rose-500/15 border-rose-500/40 text-rose-300'}`}>
-                        {empty ? (
-                          <button onClick={() => { setAddSlot(true); setAddForm({ ...addForm, date: d, time }) }} className="text-lime-400 hover:underline">+ Add</button>
-                        ) : (
-                          <span className="block">{s1 && s2 ? `C1: ${s1.player_text} / C2: ${s2.player_text}` : s1 ? `C1: ${s1.player_text}` : `C2: ${s2.player_text}`}</span>
-                        )}
-                      </div>
-                    )
-                  })}
+                )}
+                <button onClick={handleCommitImport} disabled={importPreview.validRows === 0} className="px-6 py-2.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 text-xs font-bold disabled:opacity-50">
+                  Import {importPreview.validRows} Slots
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'conversions' && (
+        <div className="glass-panel rounded-3xl p-6 border border-slate-200 dark:border-slate-800">
+          <h3 className="font-heading font-extrabold text-slate-900 dark:text-white text-lg mb-4">Conversion Requests</h3>
+          {convLoading ? (
+            <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-lime-400 border-t-transparent rounded-full animate-spin" /></div>
+          ) : conversionRequests.length === 0 ? (
+            <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-8">No conversion requests.</p>
+          ) : (
+            <div className="space-y-3">
+              {conversionRequests.map(r => (
+                <div key={r.id} className="p-4 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-1">
+                      <span className="text-sm font-bold text-slate-900 dark:text-white">{r.user_name}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                        r.status === 'pending' ? 'bg-amber-400/20 text-amber-400' :
+                        r.status === 'approved' ? 'bg-emerald-400/20 text-emerald-400' :
+                        'bg-rose-400/20 text-rose-400'
+                      }`}>{r.status}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Convert {r.count} {r.from} → {r.to} ({r.from === 'private' ? r.count * 2 : r.count} {r.to} sessions)
+                    </p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{r.created_at?.slice(0, 16)}</p>
+                  </div>
+                  {r.status === 'pending' && (
+                    <div className="flex gap-2 shrink-0">
+                      <button onClick={() => handleConvertAction(r.id, 'approve')} className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-bold border border-emerald-500/20 hover:bg-emerald-500/20 flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Approve
+                      </button>
+                      <button onClick={() => handleConvertAction(r.id, 'reject')} className="px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 text-xs font-bold border border-rose-500/20 hover:bg-rose-500/20">
+                        Reject
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
-          </div>
+          )}
         </div>
       )}
 

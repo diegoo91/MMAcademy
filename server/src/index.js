@@ -17,12 +17,16 @@ import bookingsRoutes from './routes/bookings.js'
 import importsRoutes from './routes/imports.js'
 import dashboardRoutes from './routes/dashboard.js'
 import commentsRoutes from './routes/comments.js'
+import notificationsRoutes from './routes/notifications.js'
+import conversionRequestsRoutes from './routes/conversion-requests.js'
+import expensesRoutes from './routes/expenses.js'
+import reportsRoutes from './routes/reports.js'
 
 const app = express()
 const PORT = process.env.PORT || 5174
 
 app.use(helmet({ contentSecurityPolicy: false }))
-app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173'], credentials: true }))
+app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:5175', 'http://127.0.0.1:5173'], credentials: true }))
 app.use(express.json({ limit: '5mb' }))
 app.use('/uploads', express.static(join(__dirname, '..', 'uploads')))
 
@@ -38,6 +42,10 @@ app.use('/api/bookings', bookingsRoutes)
 app.use('/api/imports', importsRoutes)
 app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/comments', commentsRoutes)
+app.use('/api/notifications', notificationsRoutes)
+app.use('/api/conversion-requests', conversionRequestsRoutes)
+app.use('/api/expenses', expensesRoutes)
+app.use('/api/reports', reportsRoutes)
 
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: new Date().toISOString() }))
 

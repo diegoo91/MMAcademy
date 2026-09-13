@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
 import { CheckCircle2, XCircle, Search, Eye, X, Trash2, Edit3, ArrowRightLeft } from 'lucide-react'
 import { api } from '../../lib/api'
+import { useAuth } from '../../context/AuthContext'
 
 export default function Bookings() {
+  const { isAdmin } = useAuth()
+  const canEdit = isAdmin
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
@@ -144,34 +147,38 @@ export default function Bookings() {
                         <button onClick={() => setViewBooking(b)} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-colors" title="View Details">
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button onClick={() => setEditBooking(b)} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors" title="Edit Sessions">
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                        {(b.private_remaining > 0 || b.group_remaining > 0) && (
-                          <button onClick={() => {
-                            const hasPrivate = (b.private_remaining || 0) > 0
-                            const hasGroup = (b.group_remaining || 0) > 0
-                            const defaultDir = hasPrivate ? 'private_to_group' : 'group_to_private'
-                            setConvertBooking(b)
-                            setConvertForm({ direction: defaultDir, count: 1 })
-                            setConvertError('')
-                          }} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-purple-400 hover:bg-purple-500/10 rounded-lg transition-colors" title="Convert Credits">
-                            <ArrowRightLeft className="w-4 h-4" />
-                          </button>
-                        )}
-                        {b.status === 'pending' && (
+                        {canEdit && (
                           <>
-                            <button onClick={() => handleStatus(b.id, 'confirmed')} className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors" title="Confirm">
-                              <CheckCircle2 className="w-4 h-4" />
+                            <button onClick={() => setEditBooking(b)} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors" title="Edit Sessions">
+                              <Edit3 className="w-4 h-4" />
                             </button>
-                            <button onClick={() => handleStatus(b.id, 'cancelled')} className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors" title="Cancel">
-                              <XCircle className="w-4 h-4" />
+                            {(b.private_remaining > 0 || b.group_remaining > 0) && (
+                              <button onClick={() => {
+                                const hasPrivate = (b.private_remaining || 0) > 0
+                                const hasGroup = (b.group_remaining || 0) > 0
+                                const defaultDir = hasPrivate ? 'private_to_group' : 'group_to_private'
+                                setConvertBooking(b)
+                                setConvertForm({ direction: defaultDir, count: 1 })
+                                setConvertError('')
+                              }} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-purple-400 hover:bg-purple-500/10 rounded-lg transition-colors" title="Convert Credits">
+                                <ArrowRightLeft className="w-4 h-4" />
+                              </button>
+                            )}
+                            {b.status === 'pending' && (
+                              <>
+                                <button onClick={() => handleStatus(b.id, 'confirmed')} className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors" title="Confirm">
+                                  <CheckCircle2 className="w-4 h-4" />
+                                </button>
+                                <button onClick={() => handleStatus(b.id, 'cancelled')} className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors" title="Cancel">
+                                  <XCircle className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                            <button onClick={() => setDeleteConfirm(b)} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors" title="Delete">
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           </>
                         )}
-                        <button onClick={() => setDeleteConfirm(b)} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors" title="Delete">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
                       </div>
                     </td>
                   </tr>

@@ -10,6 +10,7 @@ router.get('/', (req, res) => {
   try {
     const { search, skill, page = 1, limit = 50 } = req.query
     const all = db.findAll('players')
+    const allSlots = db.findAll('slots')
     let filtered = all
     if (search) {
       const q = search.toLowerCase()
@@ -19,10 +20,47 @@ router.get('/', (req, res) => {
     filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     const total = filtered.length
     const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit)
-    const players = filtered.slice(offset, offset + parseInt(limit))
+    const players = filtered.slice(offset, offset + parseInt(limit)).map(p => {
+      const sessions = allSlots.filter(s => {
+        if (!s.player_text) return false
+        const names = s.player_text.split(/[/+]/).map(n => n.trim().toLowerCase())
+        return names.includes(p.full_name.toLowerCase())
+      }).length
+      return { ...p, remaining_sessions: sessions }
+    })
     res.json({ players, total, page: parseInt(page), limit: parseInt(limit) })
   } catch (err) {
     console.error('List players error:', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+router.get('/:id/sessions', (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    const player = db.get('players', id)
+    if (!player) return res.status(404).json({ error: 'Player not found' })
+    const playerName = player.full_name.toLowerCase()
+    const allSlots = db.findAll('slots')
+    const sessions = allSlots
+      .filter(s => {
+        if (!s.player_text) return false
+        const names = s.player_text.split(/[/+]/).map(n => n.trim().toLowerCase())
+        return names.includes(playerName)
+      })
+      .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time))
+      .map(s => {
+        const booking = s.booking_id ? db.get('bookings', s.booking_id) : null
+        return {
+          date: s.date, time: s.time, court: s.court,
+          session_type: booking ? booking.session_type : null,
+          paid: booking ? !!booking.paid : null,
+          booking_ref: booking ? booking.ref : null,
+        }
+      })
+    res.json({ player: { id: player.id, full_name: player.full_name }, sessions })
+  } catch (err) {
+    console.error('Player sessions error:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -38,7 +76,7 @@ router.get('/:id', (req, res) => {
   }
 })
 
-router.post('/', requireRole('superadmin', 'admin', 'coach'), (req, res) => {
+router.post('/', requireRole('superadmin', 'admin'), (req, res) => {
   try {
     const { full_name, email, phone, dob, skill_level, notes } = req.body
     if (!full_name || !email) return res.status(400).json({ error: 'Full name and email are required' })
@@ -53,7 +91,7 @@ router.post('/', requireRole('superadmin', 'admin', 'coach'), (req, res) => {
   }
 })
 
-router.put('/:id', requireRole('superadmin', 'admin', 'coach'), (req, res) => {
+router.put('/:id', requireRole('superadmin', 'admin'), (req, res) => {
   try {
     const id = parseInt(req.params.id)
     const player = db.get('players', id)
