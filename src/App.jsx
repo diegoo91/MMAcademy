@@ -1,11 +1,13 @@
 import { BrowserRouter, Route, Routes, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { ThemeProvider } from './context/ThemeContext'
 import Layout from './components/Layout'
 import Home from './pages/Home'
 import SignUp from './pages/SignUp'
 import Schedule from './pages/Schedule'
 import Book from './pages/Book'
 import Payment from './pages/Payment'
+import Profile from './pages/Profile'
 import Login from './pages/Login'
 import AdminLayout from './pages/admin/AdminLayout'
 import Dashboard from './pages/admin/Dashboard'
@@ -13,10 +15,13 @@ import Players from './pages/admin/Players'
 import Results from './pages/admin/Results'
 import Users from './pages/admin/Users'
 import Imports from './pages/admin/Imports'
+import Bookings from './pages/admin/Bookings'
+import Comments from './pages/admin/Comments'
+import ScheduleManager from './pages/admin/ScheduleManager'
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth()
-  if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><div className="w-8 h-8 border-2 border-lime-400 border-t-transparent rounded-full animate-spin" /></div>
+  if (loading) return <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center"><div className="w-8 h-8 border-2 border-lime-400 border-t-transparent rounded-full animate-spin" /></div>
   if (!user) return <Navigate to="/login" replace />
   if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />
   return children
@@ -26,7 +31,7 @@ function AppRoutes() {
   const { loading } = useAuth()
 
   if (loading) {
-    return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><div className="w-8 h-8 border-2 border-lime-400 border-t-transparent rounded-full animate-spin" /></div>
+    return <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center"><div className="w-8 h-8 border-2 border-lime-400 border-t-transparent rounded-full animate-spin" /></div>
   }
 
   return (
@@ -37,6 +42,11 @@ function AppRoutes() {
         <Route path="/schedule" element={<Schedule />} />
         <Route path="/book" element={<Book />} />
         <Route path="/payment" element={<Payment />} />
+        <Route path="/profile" element={
+          <ProtectedRoute>
+            <Profile />
+          </ProtectedRoute>
+        } />
         <Route path="/login" element={<Login />} />
 
         <Route path="/admin" element={
@@ -45,6 +55,8 @@ function AppRoutes() {
           </ProtectedRoute>
         }>
           <Route index element={<Dashboard />} />
+          <Route path="bookings" element={<Bookings />} />
+          <Route path="schedule" element={<ScheduleManager />} />
           <Route path="players" element={<Players />} />
           <Route path="results" element={<Results />} />
           <Route path="users" element={
@@ -53,6 +65,12 @@ function AppRoutes() {
             </ProtectedRoute>
           } />
           <Route path="imports" element={<Imports />} />
+          <Route path="bookings" element={<Bookings />} />
+          <Route path="comments" element={
+            <ProtectedRoute roles={['superadmin', 'admin']}>
+              <Comments />
+            </ProtectedRoute>
+          } />
         </Route>
 
         <Route path="*" element={<Home />} />
@@ -63,10 +81,12 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </AuthProvider>
+    </ThemeProvider>
   )
 }

@@ -106,3 +106,13 @@ export async function initAuth() {
     return null
   }
 }
+
+export async function downloadFile(path) {
+  const url = `${API_BASE}${path}`
+  const headers = {}
+  const token = getToken()
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const res = await fetch(url, { credentials: 'include', headers })
+  if (!res.ok) throw new Error('Download failed')
+  return res.blob()
+}

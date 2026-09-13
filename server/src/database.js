@@ -6,10 +6,16 @@ import { nanoid } from 'nanoid'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DB_PATH = join(__dirname, '..', 'academy.db.json')
 
-let data = { users: [], players: [], results: [], slots: [], bookings: [], import_batches: [] }
+let data = { users: [], players: [], results: [], slots: [], bookings: [], import_batches: [], comments: [] }
 
 if (existsSync(DB_PATH)) {
   try { data = JSON.parse(readFileSync(DB_PATH, 'utf-8')) } catch { /* start fresh */ }
+}
+
+// Ensure all expected collections exist (handles adding new collections)
+const DEFAULTS = { users: [], players: [], results: [], slots: [], bookings: [], import_batches: [], comments: [] }
+for (const [key, val] of Object.entries(DEFAULTS)) {
+  if (!Array.isArray(data[key])) data[key] = val
 }
 
 function save() { writeFileSync(DB_PATH, JSON.stringify(data, null, 2)) }

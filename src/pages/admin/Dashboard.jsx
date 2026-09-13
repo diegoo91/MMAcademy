@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BarChart3, Calendar, FileUp, TrendingUp, Users, UserX } from 'lucide-react'
+import { ArrowRightLeft, BarChart3, Calendar, FileUp, TrendingUp, Users, UserX } from 'lucide-react'
 import { api } from '../../lib/api'
 
 function StatCard({ icon: Icon, label, value, color = 'lime' }) {
@@ -12,14 +12,14 @@ function StatCard({ icon: Icon, label, value, color = 'lime' }) {
     cyan: 'bg-cyan-400/10 text-cyan-400 border-cyan-400/20',
   }
   return (
-    <div className="glass-panel rounded-2xl p-5 border border-slate-800">
+    <div className="glass-panel rounded-2xl p-5 border border-slate-200 dark:border-slate-800">
       <div className="flex items-center gap-3 mb-3">
         <div className={`p-2.5 rounded-xl border ${colors[color]}`}>
           <Icon className="w-5 h-5" />
         </div>
-        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{label}</span>
+        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{label}</span>
       </div>
-      <p className="text-3xl font-black text-white font-heading">{value}</p>
+      <p className="text-3xl font-black text-slate-900 dark:text-white font-heading">{value}</p>
     </div>
   )
 }
@@ -37,13 +37,13 @@ export default function Dashboard() {
   if (error) return <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm">{error}</div>
   if (!data) return null
 
-  const { stats, recentBookings, recentImports, usersByRole } = data
+  const { stats, recentBookings, recentImports, usersByRole, sessionCredits = [] } = data
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-heading text-3xl font-black text-white">Dashboard</h1>
-        <p className="text-slate-400 text-sm mt-1">Academy overview and key metrics</p>
+        <h1 className="font-heading text-3xl font-black text-slate-900 dark:text-white">Dashboard</h1>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Academy overview and key metrics</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
@@ -56,17 +56,17 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="glass-panel rounded-2xl border border-slate-800 p-6">
-          <h3 className="text-lg font-bold text-white mb-4">Users by Role</h3>
+        <div className="glass-panel rounded-2xl border border-slate-200 dark:border-slate-800 p-6">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Users by Role</h3>
           <div className="space-y-3">
             {usersByRole.map(r => (
               <div key={r.role} className="flex items-center gap-3">
                 <div className="flex-1">
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-slate-300 capitalize">{r.role}</span>
-                    <span className="text-white font-bold">{r.count}</span>
+                    <span className="text-slate-700 dark:text-slate-300 capitalize">{r.role}</span>
+                    <span className="text-slate-900 dark:text-white font-bold">{r.count}</span>
                   </div>
-                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <div className="h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                     <div className="h-full bg-lime-400 rounded-full transition-all" style={{ width: `${stats.totalUsers > 0 ? (r.count / stats.totalUsers) * 100 : 0}%` }} />
                   </div>
                 </div>
@@ -75,21 +75,21 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="glass-panel rounded-2xl border border-slate-800 p-6">
-          <h3 className="text-lg font-bold text-white mb-4">Recent Bookings</h3>
+        <div className="glass-panel rounded-2xl border border-slate-200 dark:border-slate-800 p-6">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Recent Bookings</h3>
           {recentBookings.length === 0 ? (
-            <p className="text-slate-500 text-sm">No bookings yet.</p>
+            <p className="text-slate-500 dark:text-slate-400 text-sm">No bookings yet.</p>
           ) : (
             <div className="space-y-3">
               {recentBookings.map(b => (
-                <div key={b.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-900/50 border border-slate-800">
+                <div key={b.id} className="flex items-center justify-between p-3 rounded-xl bg-white/50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
                   <div>
-                    <p className="text-sm font-semibold text-white">{b.user_name || 'Unknown'}</p>
-                    <p className="text-xs text-slate-400">{b.ref} - {b.session_type}</p>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{b.user_name || 'Unknown'}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{b.ref} - {b.session_type}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-bold text-lime-400">EGP {b.total?.toLocaleString()}</p>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${b.status === 'confirmed' ? 'bg-green-500/10 text-green-400' : b.status === 'cancelled' ? 'bg-rose-500/10 text-rose-400' : 'bg-slate-500/10 text-slate-400'}`}>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${b.status === 'confirmed' ? 'bg-green-500/10 text-green-400' : b.status === 'cancelled' ? 'bg-rose-500/10 text-rose-400' : 'bg-slate-500/10 text-slate-500 dark:text-slate-400'}`}>
                       {b.status}
                     </span>
                   </div>
@@ -100,15 +100,45 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="glass-panel rounded-2xl border border-slate-800 p-6">
-        <h3 className="text-lg font-bold text-white mb-4">Recent Imports</h3>
-        {recentImports.length === 0 ? (
-          <p className="text-slate-500 text-sm">No imports yet.</p>
+      <div className="glass-panel rounded-2xl border border-slate-200 dark:border-slate-800 p-6">
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2"><ArrowRightLeft className="w-5 h-5 text-purple-400" /> Session Credits (Private &harr; Group)</h3>
+        {sessionCredits.length === 0 ? (
+          <p className="text-slate-500 dark:text-slate-400 text-sm">No active credits.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-slate-400 text-xs uppercase">
+                <tr className="text-slate-500 dark:text-slate-400 text-xs uppercase">
+                  <th className="text-left pb-3 font-semibold">Player</th>
+                  <th className="text-left pb-3 font-semibold">Private Remaining</th>
+                  <th className="text-left pb-3 font-semibold">Group Remaining</th>
+                  <th className="text-left pb-3 font-semibold">Bookings</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                {sessionCredits.map(c => (
+                  <tr key={c.user_id}>
+                    <td className="py-3 text-slate-900 dark:text-white font-medium">{c.name}</td>
+                    <td className="py-3 text-lime-400 font-bold">{c.private_remaining}</td>
+                    <td className="py-3 text-lime-400 font-bold">{c.group_remaining}</td>
+                    <td className="py-3 text-slate-500 dark:text-slate-400 text-xs">{c.bookings.map(b => b.ref).join(', ')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="glass-panel rounded-2xl border border-slate-200 dark:border-slate-800 p-6">
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Recent Imports</h3>
+        {recentImports.length === 0 ? (
+          <p className="text-slate-500 dark:text-slate-400 text-sm">No imports yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-slate-500 dark:text-slate-400 text-xs uppercase">
                   <th className="text-left pb-3 font-semibold">Kind</th>
                   <th className="text-left pb-3 font-semibold">Filename</th>
                   <th className="text-left pb-3 font-semibold">Rows</th>
@@ -116,14 +146,14 @@ export default function Dashboard() {
                   <th className="text-left pb-3 font-semibold">Date</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                 {recentImports.map(ib => (
                   <tr key={ib.id}>
-                    <td className="py-3 text-white font-medium capitalize">{ib.kind}</td>
-                    <td className="py-3 text-slate-300">{ib.filename}</td>
-                    <td className="py-3 text-slate-300">{ib.row_count}</td>
-                    <td className="py-3 text-slate-300">{ib.user_name || 'Unknown'}</td>
-                    <td className="py-3 text-slate-400 text-xs">{new Date(ib.created_at).toLocaleDateString()}</td>
+                    <td className="py-3 text-slate-900 dark:text-white font-medium capitalize">{ib.kind}</td>
+                    <td className="py-3 text-slate-700 dark:text-slate-300">{ib.filename}</td>
+                    <td className="py-3 text-slate-700 dark:text-slate-300">{ib.row_count}</td>
+                    <td className="py-3 text-slate-700 dark:text-slate-300">{ib.user_name || 'Unknown'}</td>
+                    <td className="py-3 text-slate-500 dark:text-slate-400 text-xs">{new Date(ib.created_at).toLocaleDateString()}</td>
                   </tr>
                 ))}
               </tbody>

@@ -35,7 +35,7 @@ router.post('/', requireRole('superadmin'), (req, res) => {
   }
 })
 
-router.put('/:id', requireRole('superadmin'), (req, res) => {
+router.put('/:id', requireRole('superadmin', 'admin'), (req, res) => {
   try {
     const id = parseInt(req.params.id)
     const user = db.get('users', id)
@@ -66,7 +66,7 @@ router.delete('/:id', requireRole('superadmin'), (req, res) => {
   }
 })
 
-router.post('/:id/reset-password', requireRole('superadmin'), (req, res) => {
+router.post('/:id/reset-password', requireRole('superadmin', 'admin'), (req, res) => {
   try {
     const id = parseInt(req.params.id)
     if (!db.get('users', id)) return res.status(404).json({ error: 'User not found' })

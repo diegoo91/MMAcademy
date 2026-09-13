@@ -1,18 +1,22 @@
 import { useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { BarChart3, ChevronLeft, FileUp, LayoutDashboard, LogOut, Shield, Users, UserX } from 'lucide-react'
+import { BarChart3, ChevronLeft, ClipboardList, FileUp, LayoutDashboard, LogOut, Menu, MessageSquare, Shield, Users, UserX, X, CalendarClock } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 
 const sidebarLinks = [
   { name: 'Dashboard', path: '/admin', icon: LayoutDashboard, exact: true },
+  { name: 'Bookings', path: '/admin/bookings', icon: ClipboardList },
+  { name: 'Schedule Manager', path: '/admin/schedule', icon: CalendarClock },
   { name: 'Players', path: '/admin/players', icon: Users },
   { name: 'Results', path: '/admin/results', icon: BarChart3 },
   { name: 'Users', path: '/admin/users', icon: UserX },
   { name: 'Imports', path: '/admin/imports', icon: FileUp },
+  { name: 'Comments', path: '/admin/comments', icon: MessageSquare },
 ]
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const { logout } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
@@ -21,67 +25,86 @@ export default function AdminLayout() {
 
   const handleLogout = () => { logout(); navigate('/') }
 
+  const sidebarContent = (collapsed) => (
+    <>
+      <div className="p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
+        {(!collapsed || mobileOpen) && (
+          <div className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-lime-400" />
+            <span className="font-bold text-slate-900 dark:text-white text-sm">Admin Panel</span>
+          </div>
+        )}
+        <button onClick={() => mobileOpen ? setMobileOpen(false) : setSidebarOpen(!sidebarOpen)} className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+          {mobileOpen ? <X className="w-4 h-4" /> : <ChevronLeft className={`w-4 h-4 transition-transform ${!sidebarOpen ? 'rotate-180' : ''}`} />}
+        </button>
+      </div>
+
+      <nav className="flex-1 p-3 space-y-1">
+        {sidebarLinks.map(link => {
+          const active = isActive(link.path, link.exact)
+          const Icon = link.icon
+          return (
+            <Link
+              key={link.path}
+              to={link.path}
+              onClick={() => setMobileOpen(false)}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                active
+                  ? 'bg-lime-400/10 text-lime-400 border border-lime-400/20'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/50'
+              }`}
+              title={collapsed ? link.name : undefined}
+            >
+              <Icon className="w-5 h-5 shrink-0" />
+              {(!collapsed || mobileOpen) && <span>{link.name}</span>}
+            </Link>
+          )
+        })}
+      </nav>
+
+      <div className="p-3 border-t border-slate-200 dark:border-slate-800">
+        <Link
+          to="/"
+          onClick={() => setMobileOpen(false)}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-all"
+        >
+          <ChevronLeft className="w-5 h-5 shrink-0" />
+          {(!collapsed || mobileOpen) && <span>Back to Site</span>}
+        </Link>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-rose-400 hover:bg-rose-500/10 transition-all mt-1"
+        >
+          <LogOut className="w-5 h-5 shrink-0" />
+          {(!collapsed || mobileOpen) && <span>Log Out</span>}
+        </button>
+      </div>
+    </>
+  )
+
   return (
-    <div className="flex min-h-[calc(100vh-5rem)] bg-slate-950">
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} hidden md:flex flex-col bg-slate-900/50 border-r border-slate-800 transition-all duration-300`}>
-        <div className="p-4 flex items-center justify-between border-b border-slate-800">
-          {sidebarOpen && (
-            <div className="flex items-center gap-2">
-              <Shield className="w-5 h-5 text-lime-400" />
-              <span className="font-bold text-white text-sm">Admin Panel</span>
-            </div>
-          )}
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
-            <ChevronLeft className={`w-4 h-4 transition-transform ${!sidebarOpen ? 'rotate-180' : ''}`} />
-          </button>
-        </div>
-
-        <nav className="flex-1 p-3 space-y-1">
-          {sidebarLinks.map(link => {
-            const active = isActive(link.path, link.exact)
-            const Icon = link.icon
-            return (
-              <Link
-                key={link.path}
-                to={link.path}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  active
-                    ? 'bg-lime-400/10 text-lime-400 border border-lime-400/20'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                }`}
-                title={!sidebarOpen ? link.name : undefined}
-              >
-                <Icon className="w-5 h-5 shrink-0" />
-                {sidebarOpen && <span>{link.name}</span>}
-              </Link>
-            )
-          })}
-        </nav>
-
-        <div className="p-3 border-t border-slate-800">
-          <Link
-            to="/"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all"
-          >
-            <ChevronLeft className="w-5 h-5 shrink-0" />
-            {sidebarOpen && <span>Back to Site</span>}
-          </Link>
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-rose-400 hover:bg-rose-500/10 transition-all mt-1"
-          >
-            <LogOut className="w-5 h-5 shrink-0" />
-            {sidebarOpen && <span>Log Out</span>}
-          </button>
-        </div>
+    <div className="flex min-h-[calc(100vh-5rem)] bg-slate-50 dark:bg-slate-950 relative">
+      {/* Desktop sidebar */}
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} hidden md:flex flex-col bg-white/50 dark:bg-slate-900/50 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 shrink-0`}>
+        {sidebarContent(!sidebarOpen)}
       </aside>
 
-      <main className="flex-1 p-4 md:p-8 overflow-auto">
+      {/* Mobile drawer */}
+      {mobileOpen && (
+        <>
+          <div className="fixed inset-0 z-40 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-sm md:hidden" onClick={() => setMobileOpen(false)} />
+          <aside className="fixed inset-y-0 left-0 z-50 w-64 flex flex-col bg-slate-100 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 md:hidden animate-fadeIn">
+            {sidebarContent(false)}
+          </aside>
+        </>
+      )}
+
+      <main className="flex-1 p-4 md:p-8 overflow-auto min-w-0">
         <div className="md:hidden flex items-center gap-2 mb-6">
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300">
-            <LayoutDashboard className="w-5 h-5" />
+          <button onClick={() => setMobileOpen(true)} className="p-2 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+            <Menu className="w-5 h-5" />
           </button>
-          <span className="text-sm font-bold text-white">Admin Panel</span>
+          <span className="text-sm font-bold text-slate-900 dark:text-white">Admin Panel</span>
         </div>
         <Outlet />
       </main>

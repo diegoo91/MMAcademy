@@ -1,8 +1,18 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
+import multer from 'multer'
+import { fileURLToPath } from 'url'
+import { dirname, join, extname } from 'path'
 import db from '../database.js'
 import { signAccessToken, signRefreshToken, verifyRefreshToken, cookieOptions } from '../utils/tokens.js'
 import { authenticate } from '../middleware/auth.js'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const profileStorage = multer.diskStorage({
+  destination: join(__dirname, '..', '..', 'uploads'),
+  filename: (req, file, cb) => cb(null, `profile_${req.user.id}${extname(file.originalname)}`)
+})
+const profileUpload = multer({ storage: profileStorage, limits: { fileSize: 5 * 1024 * 1024 } })
 
 const router = Router()
 
@@ -80,6 +90,35 @@ router.post('/change-password', authenticate, (req, res) => {
     res.json({ ok: true })
   } catch (err) {
     console.error('Change password error:', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+router.put('/profile', authenticate, (req, res) => {
+  try {
+    const { name, phone, skill_level } = req.body
+    const updates = {}
+    if (name) updates.name = name
+    if (phone !== undefined) updates.phone = phone
+    if (skill_level) updates.skill_level = skill_level
+    const user = db.update('users', req.user.id, updates)
+    if (!user) return res.status(404).json({ error: 'User not found' })
+    const { password_hash, ...safe } = user
+    res.json(safe)
+  } catch (err) {
+    console.error('Update profile error:', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+router.post('/avatar', authenticate, profileUpload.single('avatar'), (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
+    const avatarPath = `/uploads/profile_${req.user.id}${extname(req.file.originalname)}`
+    db.update('users', req.user.id, { avatar: avatarPath })
+    res.json({ avatar: avatarPath })
+  } catch (err) {
+    console.error('Upload avatar error:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 })

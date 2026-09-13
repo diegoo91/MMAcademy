@@ -18,7 +18,7 @@ export const PROGRAMS = [
     image: '/images/court.png',
     description:
       'Dedicated 1-on-1 coaching with personalised drills and technique work.',
-    packages: '1 Session (1,000 EGP) • 4 Sessions (3,600 EGP) • 8 Sessions (7,000 EGP)',
+    packages: '1 Session (1,000 EGP) • 4 Sessions (3,600 EGP) • 8 Sessions (7,000 EGP) • 12 Sessions (10,800 EGP) • 16 Sessions (14,000 EGP)',
     features: [
       'Dedicated personal coach',
       'Technique, footwork & glass play',
@@ -28,15 +28,15 @@ export const PROGRAMS = [
   },
   {
     id: 'group',
-    title: 'Group Class',
+    title: 'Group (2 Persons)',
     priceText: '500 EGP / session',
     level: 'All Levels',
     duration: '1 Hour',
     image: '/images/clinic.png',
-    description: 'High-energy group training matched by skill level.',
-    packages: '1 Session (500 EGP) • 4 Sessions (1,800 EGP) • 8 Sessions (3,500 EGP)',
+    description: 'High-energy 2-person group training matched by skill level.',
+    packages: '1 Session (500 EGP) • 4 Sessions (1,800 EGP) • 8 Sessions (3,500 EGP) • 16 Sessions (7,000 EGP)',
     features: [
-      'Small groups per court',
+      '2-person group sessions',
       'Match scenario drills',
       'Per player rate • 1 Hour duration',
       'Sun–Thu, 3:00 PM – 11:00 PM',
@@ -47,7 +47,7 @@ export const PROGRAMS = [
 export const GALLERY_IMAGES = [
   { id: 1, title: 'Academy Court 1', category: 'Courts', image: '/images/hero.png', tag: 'Panoramic' },
   { id: 2, title: 'Night Session Under LEDs', category: 'Night Play', image: '/images/court.png', tag: 'Pro Lighting' },
-  { id: 3, title: 'Coaching Clinic', category: 'Training', image: '/images/clinic.png', tag: 'Tactical Drills' },
+  { id: 3, title: 'Group Training Session', category: 'Training', image: '/images/clinic.png', tag: '2-Person Drills' },
   { id: 4, title: 'Player Lounge', category: 'Facilities', image: '/images/lounge.png', tag: 'Amenities' },
   { id: 5, title: 'Official Pricing Flyer', category: 'Facilities', image: '/images/pricing.jpg', tag: 'Official Packages' },
   { id: 6, title: 'Academy Court 2', category: 'Courts', image: '/images/hero.png', tag: 'All-Weather' },

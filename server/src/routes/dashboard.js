@@ -24,9 +24,25 @@ router.get('/', (req, res) => {
       return { ...ib, user_name: u ? u.name : null }
     })
     const usersByRole = ['superadmin', 'admin', 'coach', 'player'].map(role => ({ role, count: db.count('users', u => u.role === role) }))
+
+    const confirmedBookings = db.findAll('bookings', b => b.status === 'confirmed')
+    const userCredits = {}
+    for (const b of confirmedBookings) {
+      if (!b.user_id) continue
+      const u = db.get('users', b.user_id)
+      const name = u ? u.name : b.player_name || 'Unknown'
+      if (!userCredits[b.user_id]) {
+        userCredits[b.user_id] = { user_id: b.user_id, name, private_remaining: 0, group_remaining: 0, bookings: [] }
+      }
+      userCredits[b.user_id].private_remaining += b.private_remaining || 0
+      userCredits[b.user_id].group_remaining += b.group_remaining || 0
+      userCredits[b.user_id].bookings.push({ ref: b.ref, private_remaining: b.private_remaining || 0, group_remaining: b.group_remaining || 0 })
+    }
+    const sessionCredits = Object.values(userCredits).filter(c => c.private_remaining > 0 || c.group_remaining > 0)
+
     res.json({
       stats: { totalUsers, totalPlayers, totalResults, totalBookings, activeBookings, totalRevenue, occupancyRate: totalSlots > 0 ? Math.round((occupiedSlots / totalSlots) * 100) : 0 },
-      recentBookings, recentImports, usersByRole
+      recentBookings, recentImports, usersByRole, sessionCredits
     })
   } catch (err) {
     console.error('Dashboard error:', err)
