@@ -13,10 +13,10 @@ router.get('/', (req, res) => {
     const totalPlayers = db.count('users', u => u.role === 'player')
     const totalResults = db.count('results')
     const totalBookings = db.count('bookings')
-    const activeBookings = db.count('bookings', b => b.status === 'confirmed')
-    const totalRevenue = db.sum('bookings', 'total', b => b.status === 'confirmed')
+    const activeBookings = db.count('bookings', b => b.status === 'player_confirmed' || b.status === 'payment_approved' || b.status === 'schedule_approved' || b.status === 'payment_pending')
+    const totalRevenue = db.sum('payments', 'amount', p => p.status === 'payment_approved')
     const totalSlots = db.count('slots')
-    const occupiedSlots = db.count('slots', s => s.player_text && s.player_text.trim() !== '')
+    const occupiedSlots = db.count('slots', s => s.status === 'player_confirmed' || s.status === 'schedule_approved')
     const recentBookings = db.findAll('bookings').sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5).map(b => {
       const u = b.user_id ? db.get('users', b.user_id) : null
       return { ...b, user_name: u ? u.name : null }

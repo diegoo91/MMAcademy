@@ -20,12 +20,28 @@ router.get('/', (req, res) => {
     const total = filtered.length
     const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit)
     const players = filtered.slice(offset, offset + parseInt(limit)).map(p => {
-      const sessions = allSlots.filter(s => {
+      const playerName = (p.name || '').toLowerCase()
+      const playerSlots = allSlots.filter(s => {
         if (!s.player_text) return false
+        if (s.status !== 'player_confirmed') return false
         const names = s.player_text.split(/[/+]/).map(n => n.trim().toLowerCase())
-        return names.includes((p.name || '').toLowerCase())
-      }).length
-      return { id: p.id, full_name: p.name, email: p.email, phone: p.phone, dob: p.dob, skill_level: p.skill_level, position: p.position || '', notes: p.notes || '', private_balance: p.private_balance || 0, group_balance: p.group_balance || 0, balance_zero_since: p.balance_zero_since || null, remaining_sessions: sessions, created_at: p.created_at, updated_at: p.updated_at }
+        return names.includes(playerName)
+      })
+      const remaining_sessions = playerSlots.length
+      let used_private = 0
+      let used_group = 0
+      for (const s of playerSlots) {
+        let type = s.session_type
+        if (!type && s.booking_id) {
+          const booking = db.get('bookings', s.booking_id)
+          if (booking) type = booking.session_type
+        }
+        if (type === 'group') used_group++
+        else used_private++
+      }
+      const total_private = (p.private_balance || 0) + used_private
+      const total_group = (p.group_balance || 0) + used_group
+      return { id: p.id, full_name: p.name, email: p.email, phone: p.phone, dob: p.dob, skill_level: p.skill_level, position: p.position || '', notes: p.notes || '', private_balance: p.private_balance || 0, group_balance: p.group_balance || 0, balance_zero_since: p.balance_zero_since || null, remaining_sessions, used_private, used_group, total_private, total_group, created_at: p.created_at, updated_at: p.updated_at }
     })
     res.json({ players, total, page: parseInt(page), limit: parseInt(limit) })
   } catch (err) {

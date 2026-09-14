@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Calendar as CalendarIcon, Check, Clock, Download, FileSpreadsheet, Plus, Trash2, Upload, X } from 'lucide-react'
+import { Calendar as CalendarIcon, Check, Clock, Download, FileSpreadsheet, Plus, Trash2, Upload, X, ArrowRightLeft, Undo2, UserCheck } from 'lucide-react'
 import { api, downloadFile } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 
@@ -11,6 +11,26 @@ const TIME_LABELS = {
 }
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const ALL_TIMES = ['14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00','23:00']
+
+const STATUS_COLORS = {
+  available: 'bg-lime-400/5 text-lime-400',
+  payment_pending: 'bg-amber-500/10 text-amber-400',
+  payment_approved: 'bg-blue-500/10 text-blue-400',
+  schedule_approved: 'bg-purple-500/10 text-purple-400',
+  player_confirmed: 'bg-emerald-500/10 text-emerald-400',
+  cancelled: 'bg-rose-500/10 text-rose-400',
+  denied: 'bg-rose-500/10 text-rose-400',
+}
+
+const STATUS_LABELS = {
+  available: 'Available',
+  payment_pending: 'Payment Pending',
+  payment_approved: 'Payment Approved',
+  schedule_approved: 'Awaiting Player',
+  player_confirmed: 'Confirmed',
+  cancelled: 'Cancelled',
+  denied: 'Denied',
+}
 
 function formatDateShort(d) { const [,m,day] = d.split('-'); return `${Number(day)}/${Number(m)}` }
 function getDayName(d) { return DAY_NAMES[new Date(d + 'T00:00:00').getDay()] }
@@ -35,6 +55,7 @@ export default function ScheduleManager() {
   const [importing, setImporting] = useState(false)
   const [uploadMessage, setUploadMessage] = useState(null)
   const [balanceWarning, setBalanceWarning] = useState(null)
+  const [dayActionLoading, setDayActionLoading] = useState(null)
 
   const fetchSlots = () => {
     setLoading(true)
@@ -82,7 +103,19 @@ export default function ScheduleManager() {
   }, [slots])
 
   const availableDates = useMemo(() => [...slotsByDate.keys()].sort(), [slotsByDate])
-  const weekDates = useMemo(() => availableDates.slice(0, 5), [availableDates])
+  const weekDates = useMemo(() => {
+    const d = new Date(date + 'T00:00:00')
+    const day = d.getDay()
+    const start = new Date(d)
+    start.setDate(d.getDate() - day)
+    const dates = []
+    for (let i = 0; i < 7; i++) {
+      const dd = new Date(start)
+      dd.setDate(start.getDate() + i)
+      dates.push(dd.toISOString().slice(0, 10))
+    }
+    return dates
+  }, [date])
   const weekTimes = useMemo(() => {
     const set = new Set()
     for (const s of slots) set.add(s.time)
@@ -100,8 +133,67 @@ export default function ScheduleManager() {
     })
   }, [date, slotsByDate])
 
+  // Check if day has any payment_approved slots (can approve day)
+  const dayStats = useMemo(() => {
+    const daySlots = slotsByDate.get(date) || []
+    const paymentApproved = daySlots.filter(s => s.status === 'payment_approved').length
+    const scheduleApproved = daySlots.filter(s => s.status === 'schedule_approved').length
+    const confirmed = daySlots.filter(s => s.status === 'player_confirmed').length
+    const pending = daySlots.filter(s => s.status === 'payment_pending').length
+    return { total: daySlots.length, paymentApproved, scheduleApproved, confirmed, pending }
+  }, [date, slotsByDate])
+
   const handleDeleteSlot = async (id) => {
     try { await api.del(`/slots/${id}`); fetchSlots() } catch {}
+  }
+
+  const handleApproveSlot = async (id) => {
+    try {
+      await api.put(`/slots/${id}/approve`)
+      fetchSlots()
+    } catch (err) {
+      alert(err.message || 'Failed to approve')
+    }
+  }
+
+  const handleToggleType = async (slot) => {
+    try {
+      await api.put(`/slots/${slot.id}/toggle-type`)
+      fetchSlots()
+    } catch (err) {
+      alert(err.message || 'Failed to toggle type')
+    }
+  }
+
+  const handleApproveDay = async () => {
+    setDayActionLoading('approve')
+    try {
+      const result = await api.put(`/slots/day/${date}/approve`)
+      fetchSlots()
+    } catch (err) {
+      alert(err.message || 'Failed to approve day')
+    }
+    setDayActionLoading(null)
+  }
+
+  const handleUndoDay = async () => {
+    setDayActionLoading('undo')
+    try {
+      const result = await api.put(`/slots/day/${date}/undo`)
+      fetchSlots()
+    } catch (err) {
+      alert(err.message || 'Failed to undo day approval')
+    }
+    setDayActionLoading(null)
+  }
+
+  const handleMarkAttended = async (id) => {
+    try {
+      await api.put(`/slots/${id}/mark-attended`)
+      fetchSlots()
+    } catch (err) {
+      alert(err.message || 'Failed to mark attended')
+    }
   }
 
   const handleAddSlot = async () => {
@@ -172,6 +264,31 @@ export default function ScheduleManager() {
 
   const pendingConversions = conversionRequests.filter(r => r.status === 'pending')
 
+  const renderSlotActions = (slot) => {
+    if (!canEdit || !slot) return null
+    return (
+      <div className="flex gap-1 shrink-0">
+        {slot.status === 'payment_approved' && (
+          <button onClick={() => handleApproveSlot(slot.id)} className="p-0.5 text-emerald-400 hover:text-emerald-300" title="Approve">
+            <Check className="w-3 h-3" />
+          </button>
+        )}
+        {slot.status === 'schedule_approved' && (
+          <button onClick={() => handleMarkAttended(slot.id)} className="p-0.5 text-cyan-400 hover:text-cyan-300" title="Mark Attended (retroactive)">
+            <UserCheck className="w-3 h-3" />
+          </button>
+        )}
+        {slot.status !== 'available' && slot.status !== 'player_confirmed' && (
+          <button onClick={() => handleToggleType(slot)} className="p-0.5 text-slate-400 hover:text-amber-400" title="Toggle Private/Group">
+            <ArrowRightLeft className="w-3 h-3" />
+          </button>
+        )}
+        <button onClick={() => setEditSlot(slot)} className="p-0.5 text-slate-400 hover:text-blue-400" title="Edit"><CalendarIcon className="w-3 h-3" /></button>
+        <button onClick={() => handleDeleteSlot(slot.id)} className="p-0.5 text-slate-400 hover:text-rose-400" title="Delete"><Trash2 className="w-3 h-3" /></button>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -212,6 +329,42 @@ export default function ScheduleManager() {
             </div>
           </div>
 
+          {/* Day Approval Bar */}
+          {canEdit && view === 'day' && dayStats.total > 0 && (
+            <div className="glass-panel rounded-2xl border border-theme p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3 text-xs">
+                <span className="text-muted">Status for {getDayName(date)} {formatDateShort(date)}:</span>
+                {dayStats.paymentApproved > 0 && <span className="px-2 py-0.5 rounded-full bg-blue-400/10 text-blue-400 font-bold border border-blue-400/20">{dayStats.paymentApproved} payment approved</span>}
+                {dayStats.scheduleApproved > 0 && <span className="px-2 py-0.5 rounded-full bg-purple-400/10 text-purple-400 font-bold border border-purple-400/20">{dayStats.scheduleApproved} awaiting player</span>}
+                {dayStats.confirmed > 0 && <span className="px-2 py-0.5 rounded-full bg-emerald-400/10 text-emerald-400 font-bold border border-emerald-400/20">{dayStats.confirmed} confirmed</span>}
+                {dayStats.pending > 0 && <span className="px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-400 font-bold border border-amber-400/20">{dayStats.pending} payment pending</span>}
+              </div>
+              <div className="flex gap-2 shrink-0">
+                {dayStats.paymentApproved > 0 && (
+                  <button onClick={handleApproveDay} disabled={dayActionLoading === 'approve'} className="px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 text-xs font-bold disabled:opacity-50 flex items-center gap-1">
+                    <Check className="w-3 h-3" /> Approve Day ({dayStats.paymentApproved})
+                  </button>
+                )}
+                {dayStats.scheduleApproved > 0 && (
+                  <button onClick={handleUndoDay} disabled={dayActionLoading === 'undo'} className="px-4 py-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 text-xs font-bold disabled:opacity-50 flex items-center gap-1">
+                    <Undo2 className="w-3 h-3" /> Undo Day Approval ({dayStats.scheduleApproved})
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Status Legend */}
+          {canEdit && view === 'day' && (
+            <div className="flex flex-wrap gap-2 text-[10px]">
+              {Object.entries(STATUS_LABELS).filter(([k]) => k !== 'available').map(([key, label]) => (
+                <span key={key} className={`px-2 py-0.5 rounded-full font-bold border ${STATUS_COLORS[key]} border-current/20`}>
+                  {label}
+                </span>
+              ))}
+            </div>
+          )}
+
           {loading ? (
             <div className="flex justify-center py-16"><div className="w-8 h-8 border-2 border-lime-400 border-t-transparent rounded-full animate-spin" /></div>
           ) : view === 'day' ? (
@@ -240,25 +393,21 @@ export default function ScheduleManager() {
                             {row.label}
                           </div>
                            {[row.slot1, row.slot2, row.slot3].map((slot, i) => {
-                            const statusColor = slot
-                              ? slot.status === 'pending' ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-300'
-                              : 'bg-lime-400/5 text-lime-400'
+                            const statusColor = STATUS_COLORS[slot?.status] || STATUS_COLORS.available
                             return (
                             <div key={i} className={`px-4 py-3 border-l border-slate-200/60 dark:border-slate-800/60 text-xs font-bold text-center flex items-center justify-center gap-2 ${statusColor}`}>
                               {slot ? (
                                 <>
-                                  <span className="truncate">{slot.player_text}</span>
-                                  {slot.session_type && (
-                                    <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded shrink-0 ${slot.session_type === 'group' ? 'bg-purple-400/20 text-purple-400' : 'bg-blue-400/20 text-blue-400'}`}>
-                                      {slot.session_type === 'group' ? 'GRP' : 'PVT'}
-                                    </span>
-                                  )}
-                                  {canEdit && (
-                                    <div className="flex gap-1 shrink-0">
-                                      <button onClick={() => setEditSlot(slot)} className="p-0.5 text-slate-400 hover:text-blue-400" title="Edit"><CalendarIcon className="w-3 h-3" /></button>
-                                      <button onClick={() => handleDeleteSlot(slot.id)} className="p-0.5 text-slate-400 hover:text-rose-400" title="Delete"><Trash2 className="w-3 h-3" /></button>
-                                    </div>
-                                  )}
+                                  <div className="flex flex-col items-center gap-0.5 min-w-0">
+                                    <span className="truncate">{slot.player_text}</span>
+                                    {slot.session_type && (
+                                      <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded shrink-0 ${slot.session_type === 'group' ? 'bg-purple-400/20 text-purple-400' : 'bg-blue-400/20 text-blue-400'}`}>
+                                        {slot.session_type === 'group' ? 'GRP' : 'PVT'}
+                                      </span>
+                                    )}
+                                    <span className="text-[8px] opacity-60">{STATUS_LABELS[slot.status]}</span>
+                                  </div>
+                                  {renderSlotActions(slot)}
                                 </>
                               ) : 'Available'}
                             </div>
@@ -305,11 +454,17 @@ export default function ScheduleManager() {
                         const s3 = daySlots.find(x => x.time === time && x.court === 3)
                         const empty = !s1 && !s2 && !s3
                         const hasSlots = s1 || s2 || s3
-                        const weekStatusColor = hasSlots
-                          ? (s1?.status === 'pending' || s2?.status === 'pending' || s3?.status === 'pending') ? 'bg-amber-500/15 border-amber-500/40 text-amber-400' : 'bg-rose-500/15 border-rose-500/40 text-rose-300'
-                          : 'bg-surface/80 text-muted border-theme'
+                        const statuses = [s1?.status, s2?.status, s3?.status].filter(Boolean)
+                        let weekColor = 'bg-surface/80 text-muted border-theme'
+                        if (hasSlots) {
+                          if (statuses.includes('payment_pending')) weekColor = 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+                          else if (statuses.includes('payment_approved')) weekColor = 'bg-blue-500/15 border-blue-500/40 text-blue-400'
+                          else if (statuses.includes('schedule_approved')) weekColor = 'bg-purple-500/15 border-purple-500/40 text-purple-400'
+                          else if (statuses.every(s => s === 'player_confirmed')) weekColor = 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
+                          else weekColor = 'bg-rose-500/15 border-rose-500/40 text-rose-300'
+                        }
                         return (
-                           <div key={d} className={`p-2.5 rounded-xl border text-[11px] font-bold text-center leading-snug ${weekStatusColor}`}>
+                           <div key={d} className={`p-2.5 rounded-xl border text-[11px] font-bold text-center leading-snug ${weekColor}`}>
                             {empty ? (
                               canEdit ? <button onClick={() => { setAddSlot(true); setAddForm({ ...addForm, date: d, time }) }} className="text-lime-400 hover:underline">+ Add</button> : 'Available'
                             ) : (

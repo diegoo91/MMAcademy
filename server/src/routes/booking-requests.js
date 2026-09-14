@@ -6,24 +6,32 @@ import { requireRole } from '../middleware/rbac.js'
 const router = Router()
 router.use(authenticate)
 
+const STATUS = {
+  AVAILABLE: 'available',
+  PAYMENT_PENDING: 'payment_pending',
+  PAYMENT_APPROVED: 'payment_approved',
+  SCHEDULE_APPROVED: 'schedule_approved',
+  PLAYER_CONFIRMED: 'player_confirmed',
+  CANCELLED: 'cancelled',
+  DENIED: 'denied',
+}
+
 function notify(userId, kind, title, body, link) {
   if (!userId) return
   db.insert('notifications', { user_id: userId, kind, title, body, link: link || null, read: 0 })
 }
 
 function updateUserBalance(userId, newPriv, newGrp) {
-  const now = new Date().toISOString()
-  const bothZero = newPriv <= 0 && newGrp <= 0
   const updates = { private_balance: newPriv, group_balance: newGrp }
-  if (bothZero) {
-    updates.balance_zero_since = now
+  if (newPriv === 0 && newGrp === 0) {
+    updates.balance_zero_since = new Date().toISOString()
   } else {
     updates.balance_zero_since = null
   }
   db.update('users', userId, updates)
 }
 
-// List requests (admin sees all, player sees own)
+// List requests
 router.get('/', (req, res) => {
   try {
     const { status, kind, slot_id } = req.query
@@ -42,16 +50,13 @@ router.get('/', (req, res) => {
   }
 })
 
-// Player responds to attendance confirm (Yes → confirmed, No → opens cancel/modify)
+// Player responds to attendance confirm
 router.put('/:id/respond', (req, res) => {
   try {
     const id = parseInt(req.params.id)
     const request = db.get('booking_requests', id)
     if (!request) return res.status(404).json({ error: 'Request not found' })
     if (request.player_id !== req.user.id) return res.status(403).json({ error: 'Not your request' })
-    if (request.kind !== 'attendance_confirm' || request.status !== 'pending') {
-      return res.status(400).json({ error: 'Invalid request state' })
-    }
 
     const { response } = req.body
     if (response === 'yes') {
@@ -94,8 +99,7 @@ router.post('/', (req, res) => {
       notify(admin.id, `request_${kind}`,
         kind === 'cancel' ? 'Cancellation Requested' : 'Modification Requested',
         `${req.user.name} requested to ${kind} their slot on ${slot.date} at ${slot.time}.`,
-        '/admin/bookings'
-      )
+        '/admin/bookings')
     }
 
     res.status(201).json(request)
@@ -121,23 +125,34 @@ router.put('/:id/decide', requireRole('superadmin', 'admin'), (req, res) => {
     if (decision === 'approved') {
       if (request.kind === 'cancel') {
         if (slot) {
-          db.update('slots', slot.id, { player_text: '', status: 'available', booking_id: null, session_type: null })
+          // Set slot back to available
+          db.update('slots', slot.id, { status: STATUS.AVAILABLE, player_text: '', booking_id: null, session_type: null, user_id: null })
+
+          // Reverse balance credit (the payment_approved step credited, we need to undo it)
+          if (slot.user_id && slot.status !== STATUS.PLAYER_CONFIRMED) {
+            const user = db.get('users', slot.user_id)
+            if (user) {
+              const sessionType = slot.session_type || 'private'
+              if (sessionType === 'private') {
+                updateUserBalance(user.id, (user.private_balance || 0) - 1, user.group_balance || 0)
+              } else {
+                updateUserBalance(user.id, user.private_balance || 0, (user.group_balance || 0) - 1)
+              }
+            }
+          }
         }
         if (request.booking_id) {
           const booking = db.get('bookings', request.booking_id)
-          if (booking && booking.user_id) {
-            const user = db.get('users', booking.user_id)
-            if (user && booking.deducted_from) {
-              const count = booking.deducted_count || (booking.sessions_json ? JSON.parse(booking.sessions_json).length : 0)
-              if (booking.deducted_from === 'private') {
-                updateUserBalance(user.id, (user.private_balance || 0) + count, user.group_balance || 0)
-              } else if (booking.deducted_from === 'group') {
-                updateUserBalance(user.id, user.private_balance || 0, (user.group_balance || 0) + count)
-              }
+          if (booking) {
+            // Check if all slots for this booking are cancelled or none left
+            const remainingSlots = db.findAll('slots', s => s.booking_id === booking.id && s.status !== STATUS.AVAILABLE && s.status !== STATUS.CANCELLED)
+            if (remainingSlots.length === 0) {
+              db.update('bookings', booking.id, { status: 'cancelled' })
             }
-            db.update('bookings', booking.id, { status: 'cancelled', private_remaining: 0, group_remaining: 0 })
-            notify(booking.user_id, 'request_approved', 'Request Approved',
-              `Your cancellation request for ${slot?.date} ${slot?.time} has been approved.`, '/schedule')
+            if (booking.user_id) {
+              notify(booking.user_id, 'request_approved', 'Cancellation Approved',
+                `Your cancellation request for ${slot?.date} ${slot?.time} has been approved. The slot is now available.`, '/schedule')
+            }
           }
         }
       } else if (request.kind === 'modify') {
@@ -156,59 +171,6 @@ router.put('/:id/decide', requireRole('superadmin', 'admin'), (req, res) => {
               `Your slot has been moved to ${proposed_date} ${proposed_time}.`, '/schedule')
           }
         }
-      } else if (request.kind === 'new_booking') {
-        if (slot) {
-          db.update('slots', slot.id, { status: 'confirmed' })
-        }
-        if (request.booking_id) {
-          const booking = db.get('bookings', request.booking_id)
-          if (booking) {
-            db.update('bookings', booking.id, { status: 'confirmed' })
-            if (booking.sessions_json) {
-              try {
-                const sessions = JSON.parse(booking.sessions_json)
-                const playerName = booking.player_name || 'Player'
-                for (const s of sessions) {
-                  db.upsert('slots', ['date', 'time', 'court'], {
-                    date: s.date, time: s.time, court: s.court,
-                    player_text: playerName, booking_id: booking.id,
-                    user_id: booking.user_id, session_type: booking.session_type,
-                    status: 'confirmed'
-                  })
-                }
-                if (booking.user_id) {
-                  const user = db.get('users', booking.user_id)
-                  if (user) {
-                    const sessionCount = sessions.length
-                    if (booking.session_type === 'private') {
-                      updateUserBalance(user.id, (user.private_balance || 0) - sessionCount, user.group_balance || 0)
-                      db.update('bookings', booking.id, { deducted_from: 'private', deducted_count: sessionCount })
-                    } else if (booking.session_type === 'group') {
-                      let newPriv = user.private_balance || 0
-                      let newGrp = user.group_balance || 0
-                      let sessionsLeft = sessionCount
-                      const useGroup = Math.min(newGrp, sessionsLeft)
-                      newGrp -= useGroup
-                      sessionsLeft -= useGroup
-                      if (sessionsLeft > 0) {
-                        const conv = Math.ceil(sessionsLeft / 2)
-                        newPriv -= conv
-                        newGrp += conv * 2
-                        sessionsLeft -= conv * 2
-                      }
-                      updateUserBalance(user.id, newPriv, newGrp)
-                      db.update('bookings', booking.id, { deducted_from: 'group', deducted_count: sessionCount })
-                    }
-                  }
-                }
-              } catch (e) { console.error('Slot creation failed:', e) }
-            }
-            if (booking.user_id) {
-              notify(booking.user_id, 'booking_confirmed', 'Booking Confirmed',
-                `Your booking ${booking.ref} has been confirmed.`, '/schedule')
-            }
-          }
-        }
       } else if (request.kind === 'reschedule_offer') {
         if (slot && proposed_date && proposed_time) {
           const conflict = db.find('slots', s => s.date === proposed_date && s.time === proposed_time && s.court === (proposed_court || slot.court) && s.id !== slot.id)
@@ -222,16 +184,11 @@ router.put('/:id/decide', requireRole('superadmin', 'admin'), (req, res) => {
         }
       }
     } else {
-      if (request.kind === 'new_booking') {
-        if (slot) {
-          db.update('slots', slot.id, { status: 'available', player_text: '' })
-        }
-        if (request.booking_id) {
-          const booking = db.get('bookings', request.booking_id)
-          if (booking && booking.user_id) {
-            notify(booking.user_id, 'booking_cancelled', 'Booking Denied',
-              `Your booking request for ${slot?.date} ${slot?.time} was not approved.`, '/book')
-          }
+      // Denied
+      if (request.kind === 'cancel') {
+        if (request.player_id) {
+          notify(request.player_id, 'request_denied', 'Cancellation Denied',
+            `Your cancellation request for ${slot?.date} ${slot?.time} was denied.`, '/schedule')
         }
       } else {
         if (request.player_id) {

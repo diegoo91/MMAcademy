@@ -29,6 +29,7 @@ router.get('/', requireRole('superadmin', 'admin'), (req, res) => {
           const playerName = (u.name || '').toLowerCase()
           used_sessions = allSlots.filter(s => {
             if (!s.player_text) return false
+            if (s.status !== 'player_confirmed') return false
             const names = s.player_text.split(/[/+]/).map(n => n.trim().toLowerCase())
             return names.includes(playerName)
           }).length

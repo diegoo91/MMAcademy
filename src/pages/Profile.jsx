@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Camera, Clock, Mail, Phone, Shield, ArrowRightLeft, Calendar, Trophy, AlertTriangle, CheckCircle, XCircle, Send } from 'lucide-react'
+import { Camera, Clock, Mail, Phone, Shield, ArrowRightLeft, Calendar, Trophy, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 import { api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 
@@ -15,15 +15,27 @@ export default function Profile() {
   const [msg, setMsg] = useState('')
   const [showResultModal, setShowResultModal] = useState(false)
   const [pendingResultsCount, setPendingResultsCount] = useState(0)
-  const [bookingRequests, setBookingRequests] = useState([])
-  const [requestsLoading, setRequestsLoading] = useState(true)
+  const [mySlots, setMySlots] = useState([])
+  const [slotsLoading, setSlotsLoading] = useState(false)
 
-  const fetchBookingRequests = () => {
-    setRequestsLoading(true)
-    api.get('/booking-requests?status=pending')
-      .then(data => setBookingRequests(Array.isArray(data) ? data : []))
+  const fetchMySlots = () => {
+    if (!user) return
+    setSlotsLoading(true)
+    // Fetch all slots and filter to this player's slots that need action
+    const today = new Date()
+    const from = new Date(today)
+    from.setDate(today.getDate() - 30)
+    const to = new Date(today)
+    to.setDate(today.getDate() + 30)
+    api.get(`/slots?from=${from.toISOString().slice(0, 10)}&to=${to.toISOString().slice(0, 10)}`)
+      .then(data => {
+        const mine = (Array.isArray(data) ? data : []).filter(s =>
+          s.user_id === user.id && ['schedule_approved', 'payment_pending', 'payment_approved'].includes(s.status)
+        )
+        setMySlots(mine)
+      })
       .catch(() => {})
-      .finally(() => setRequestsLoading(false))
+      .finally(() => setSlotsLoading(false))
   }
 
   useEffect(() => {
@@ -39,8 +51,26 @@ export default function Profile() {
         setPendingResultsCount(pending.length)
       })
       .catch(() => {})
-    fetchBookingRequests()
+    fetchMySlots()
   }, [user])
+
+  const handleConfirmSlot = async (slotId) => {
+    try {
+      await api.put(`/slots/${slotId}/confirm`)
+      fetchMySlots()
+    } catch (err) {
+      alert(err.message || 'Failed to confirm')
+    }
+  }
+
+  const handleDeclineSlot = async (slotId) => {
+    try {
+      await api.put(`/slots/${slotId}/decline`)
+      fetchMySlots()
+    } catch (err) {
+      alert(err.message || 'Failed to submit decline request')
+    }
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -67,9 +97,9 @@ export default function Profile() {
     } catch {}
   }
 
-  const confirmedCount = bookings.filter(b => b.status === 'confirmed').length
-  const pendingCount = bookings.filter(b => b.status === 'pending').length
-  const totalSessions = bookings.filter(b => b.status === 'confirmed').reduce((sum, b) => {
+  const confirmedCount = bookings.filter(b => b.status === 'player_confirmed').length
+  const pendingCount = bookings.filter(b => b.status === 'payment_pending' || b.status === 'payment_approved' || b.status === 'schedule_approved').length
+  const totalSessions = bookings.filter(b => b.status === 'player_confirmed').reduce((sum, b) => {
     try { return sum + JSON.parse(b.sessions_json).length } catch { return sum }
   }, 0)
 
@@ -78,14 +108,25 @@ export default function Profile() {
   const hasCredits = totalPrivateRemaining > 0 || totalGroupRemaining > 0
 
   const visibleBookings = user?.role === 'player'
-    ? bookings.filter(b => b.status !== 'cancelled')
+    ? bookings.filter(b => b.status !== 'cancelled' && b.status !== 'denied')
     : bookings
 
   const statusColors = {
-    pending: 'bg-amber-400/20 text-amber-400',
-    confirmed: 'bg-emerald-400/20 text-emerald-400',
+    payment_pending: 'bg-amber-400/20 text-amber-400',
+    payment_approved: 'bg-blue-400/20 text-blue-400',
+    schedule_approved: 'bg-purple-400/20 text-purple-400',
+    player_confirmed: 'bg-emerald-400/20 text-emerald-400',
     cancelled: 'bg-rose-400/20 text-rose-400',
-    completed: 'bg-slate-400/20 text-slate-400',
+    denied: 'bg-rose-400/20 text-rose-400',
+  }
+
+  const statusLabels = {
+    payment_pending: 'Payment Pending',
+    payment_approved: 'Payment Approved',
+    schedule_approved: 'Awaiting Confirmation',
+    player_confirmed: 'Confirmed',
+    cancelled: 'Cancelled',
+    denied: 'Denied',
   }
 
   if (!user) return null
@@ -173,12 +214,13 @@ export default function Profile() {
           ))}
         </div>
 
-        {/* Pending Booking Requests */}
+        {/* My Slots Awaiting Action */}
         {user?.role === 'player' && (
-          <BookingRequestsPanel
-            requests={bookingRequests}
-            loading={requestsLoading}
-            onRefresh={fetchBookingRequests}
+          <MySlotsPanel
+            slots={mySlots}
+            loading={slotsLoading}
+            onConfirm={handleConfirmSlot}
+            onDecline={handleDeclineSlot}
           />
         )}
 
@@ -223,7 +265,7 @@ export default function Profile() {
                       <div className="flex items-center gap-3 mb-1">
                         <span className="font-mono text-sm font-bold text-lime-400">{b.ref}</span>
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusColors[b.status] || ''}`}>
-                          {b.status}
+                          {statusLabels[b.status] || b.status}
                         </span>
                       </div>
                       <p className="text-xs text-muted capitalize">{b.session_type} — {sessionCount} session{sessionCount === 1 ? '' : 's'} — {Number(b.total).toLocaleString()} EGP</p>
@@ -481,100 +523,43 @@ function PlayerResultModal({ user, onClose, onSaved }) {
   )
 }
 
-function BookingRequestsPanel({ requests, loading, onRefresh }) {
-  const [responding, setResponding] = useState(null)
-  const [cancelForm, setCancelForm] = useState(null)
-  const [modifyForm, setModifyForm] = useState(null)
-  const [msg, setMsg] = useState('')
-
-  const handleRespond = async (id, response) => {
-    setResponding(id)
-    setMsg('')
-    try {
-      await api.put(`/booking-requests/${id}/respond`, { response })
-      if (response === 'no') {
-        // Find the request to show cancel/modify options
-        const req = requests.find(r => r.id === id)
-        setCancelForm(req)
-      }
-      onRefresh()
-    } catch (err) {
-      setMsg(err.message || 'Failed')
-    }
-    setResponding(null)
-  }
-
-  const handleCancel = async (slotId, bookingId) => {
-    setMsg('')
-    try {
-      await api.post('/booking-requests', { kind: 'cancel', slot_id: slotId, booking_id: bookingId })
-      setMsg('Cancellation request submitted!')
-      setCancelForm(null)
-      onRefresh()
-    } catch (err) {
-      setMsg(err.message || 'Failed')
-    }
-  }
-
-  const handleModify = async (slotId, bookingId) => {
-    if (!modifyForm?.proposed_date || !modifyForm?.proposed_time) {
-      setMsg('Please select new date and time')
-      return
-    }
-    setMsg('')
-    try {
-      await api.post('/booking-requests', {
-        kind: 'modify', slot_id: slotId, booking_id: bookingId,
-        payload: { proposed_date: modifyForm.proposed_date, proposed_time: modifyForm.proposed_time }
-      })
-      setMsg('Modification request submitted!')
-      setModifyForm(null)
-      setCancelForm(null)
-      onRefresh()
-    } catch (err) {
-      setMsg(err.message || 'Failed')
-    }
-  }
-
-  const attendanceRequests = requests.filter(r => r.kind === 'attendance_confirm')
-  const otherRequests = requests.filter(r => r.kind !== 'attendance_confirm')
-
+function MySlotsPanel({ slots, loading, onConfirm, onDecline }) {
   if (loading) return null
-  if (requests.length === 0) return null
+  if (slots.length === 0) return null
+
+  const scheduleApproved = slots.filter(s => s.status === 'schedule_approved')
+  const paymentPending = slots.filter(s => s.status === 'payment_pending')
+  const paymentApproved = slots.filter(s => s.status === 'payment_approved')
 
   return (
     <div className="glass-panel rounded-3xl border border-theme p-6 sm:p-8">
       <h2 className="font-heading text-xl font-extrabold text-theme mb-4 flex items-center gap-2">
-        <AlertTriangle className="w-5 h-5 text-amber-400" /> Pending Requests
+        <AlertTriangle className="w-5 h-5 text-amber-400" /> Your Bookings — Action Needed
       </h2>
 
-      {msg && (
-        <p className={`text-xs mb-3 text-center ${msg.includes('submitted') ? 'text-emerald-400' : 'text-rose-400'}`}>{msg}</p>
-      )}
-
-      {/* Attendance Confirmation */}
-      {attendanceRequests.length > 0 && (
+      {scheduleApproved.length > 0 && (
         <div className="space-y-3 mb-4">
-          {attendanceRequests.map(r => (
-            <div key={r.id} className="p-4 rounded-2xl bg-amber-400/5 border border-amber-400/20">
-              <p className="text-sm font-bold text-theme mb-1">Confirm Attendance</p>
+          <p className="text-xs font-bold text-purple-400 uppercase">Awaiting Your Confirmation ({scheduleApproved.length})</p>
+          {scheduleApproved.map(slot => (
+            <div key={slot.id} className="p-4 rounded-2xl bg-purple-400/5 border border-purple-400/20">
+              <p className="text-sm font-bold text-theme mb-1">
+                {slot.session_type === 'group' ? 'Group' : 'Private'} Session
+              </p>
               <p className="text-xs text-muted mb-3">
-                Slot: {r.payload?.date || 'N/A'} — Are you attending?
+                {slot.date} at {slot.time} — Court {slot.court}
               </p>
               <div className="flex gap-2">
                 <button
-                  onClick={() => handleRespond(r.id, 'yes')}
-                  disabled={responding === r.id}
-                  className="flex-1 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50"
+                  onClick={() => onConfirm(slot.id)}
+                  className="flex-1 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold flex items-center justify-center gap-1"
                 >
-                  <CheckCircle className="w-3.5 h-3.5" /> Yes
+                  <CheckCircle className="w-3.5 h-3.5" /> Yes, I'll attend
                 </button>
                 <button
-                  onClick={() => handleRespond(r.id, 'no')}
-                  disabled={responding === r.id}
-                  className="flex-1 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50"
+                  onClick={() => onDecline(slot.id)}
+                  className="flex-1 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white text-xs font-bold flex items-center justify-center gap-1"
                 >
-                  <XCircle className="w-3.5 h-3.5" /> No
+                  <XCircle className="w-3.5 h-3.5" /> Can't make it
                 </button>
               </div>
             </div>
@@ -582,46 +567,23 @@ function BookingRequestsPanel({ requests, loading, onRefresh }) {
         </div>
       )}
 
-      {/* Cancel/Modify sub-form */}
-      {cancelForm && (
-        <div className="p-4 rounded-2xl bg-surface/80 border border-theme mb-4">
-          <p className="text-sm font-bold text-theme mb-3">What would you like to do?</p>
-          <div className="flex gap-2 mb-3">
-            <button onClick={() => handleCancel(cancelForm.slot_id, cancelForm.booking_id)} className="flex-1 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white text-xs font-bold">Request Cancel</button>
-            <button onClick={() => setModifyForm({ proposed_date: '', proposed_time: '' })} className="flex-1 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-xs font-bold">Request Modify</button>
-          </div>
-          {modifyForm && (
-            <div className="space-y-2 pt-2 border-t border-theme">
-              <input type="date" value={modifyForm.proposed_date} onChange={e => setModifyForm({ ...modifyForm, proposed_date: e.target.value })} className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs" />
-              <select value={modifyForm.proposed_time} onChange={e => setModifyForm({ ...modifyForm, proposed_time: e.target.value })} className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs">
-                <option value="">Select time</option>
-                {['14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00','23:00'].map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-              <div className="flex gap-2">
-                <button onClick={() => setModifyForm(null)} className="flex-1 py-2 rounded-xl bg-surface border border-theme text-theme text-xs font-semibold">Back</button>
-                <button onClick={() => handleModify(cancelForm.slot_id, cancelForm.booking_id)} className="flex-1 py-2 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 text-xs font-bold flex items-center justify-center gap-1">
-                  <Send className="w-3 h-3" /> Submit
-                </button>
-              </div>
+      {paymentApproved.length > 0 && (
+        <div className="space-y-2 mb-4">
+          <p className="text-xs font-bold text-blue-400 uppercase">Payment Approved — Awaiting Schedule Approval ({paymentApproved.length})</p>
+          {paymentApproved.map(slot => (
+            <div key={slot.id} className="p-3 rounded-xl bg-blue-400/5 border border-blue-400/20 text-xs text-muted">
+              {slot.date} at {slot.time} — Court {slot.court} — {slot.session_type || 'session'}
             </div>
-          )}
+          ))}
         </div>
       )}
 
-      {/* Other pending requests */}
-      {otherRequests.length > 0 && (
+      {paymentPending.length > 0 && (
         <div className="space-y-2">
-          {otherRequests.map(r => (
-            <div key={r.id} className="p-3 rounded-xl bg-white/50 dark:bg-slate-900/50 border border-theme flex items-center justify-between">
-              <div>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-400/20 text-amber-400 border border-amber-400/40 mr-2">
-                  {r.kind}
-                </span>
-                <span className="text-xs text-muted">
-                  {r.payload?.date || r.slot_id ? `Slot #${r.slot_id}` : 'N/A'}
-                </span>
-              </div>
-              <span className="text-[10px] text-muted">{r.created_at?.slice(0, 10)}</span>
+          <p className="text-xs font-bold text-amber-400 uppercase">Payment Pending Review ({paymentPending.length})</p>
+          {paymentPending.map(slot => (
+            <div key={slot.id} className="p-3 rounded-xl bg-amber-400/5 border border-amber-400/20 text-xs text-muted">
+              {slot.date} at {slot.time} — Court {slot.court} — {slot.session_type || 'session'}
             </div>
           ))}
         </div>

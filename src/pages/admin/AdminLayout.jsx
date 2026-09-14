@@ -13,6 +13,7 @@ const ALL_SIDEBAR_LINKS = [
   { name: 'Imports', path: '/admin/imports', icon: FileUp, roles: ['superadmin', 'admin'] },
   { name: 'Comments', path: '/admin/comments', icon: MessageSquare, roles: ['superadmin', 'admin'] },
   { name: 'Expenses', path: '/admin/expenses', icon: DollarSign, roles: ['superadmin', 'admin'] },
+  { name: 'Payments', path: '/admin/payments', icon: DollarSign, roles: ['superadmin', 'admin'] },
   { name: 'Reports', path: '/admin/reports', icon: PieChart, roles: ['superadmin', 'admin'] },
 ]
 

@@ -10,7 +10,6 @@ import {
   Image as ImageIcon,
   RefreshCw,
   Sparkles,
-  User,
   UserCheck,
 } from 'lucide-react'
 import { api } from '../lib/api'
@@ -35,25 +34,6 @@ function groupSlotsByDate(slots) {
   return map
 }
 
-function buildDaySlots(date, daySlots) {
-  const times = [...new Set(daySlots.map(s => s.time))].sort()
-  return times.map(time => {
-    const c1 = daySlots.find(s => s.time === time && s.court === 1)
-    const c2 = daySlots.find(s => s.time === time && s.court === 2)
-    const c3 = daySlots.find(s => s.time === time && s.court === 3)
-    return {
-      time,
-      label: TIME_LABELS[time] || time,
-      court1: c1?.player_text || '',
-      court2: c2?.player_text || '',
-      court3: c3?.player_text || '',
-      slot1: c1 || null,
-      slot2: c2 || null,
-      slot3: c3 || null,
-    }
-  })
-}
-
 function formatDateShort(dateStr) {
   const [, m, d] = dateStr.split('-')
   return `${Number(d)}/${Number(m)}`
@@ -76,9 +56,6 @@ export default function Schedule() {
   const [myBookings, setMyBookings] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [changeTimeSlot, setChangeTimeSlot] = useState(null)
-  const [changeTimeForm, setChangeTimeForm] = useState({ date: '', time: '15:00', court: 1 })
-
   const mySessionKeys = useMemo(() => {
     const keys = new Set()
     for (const b of myBookings) {
@@ -100,7 +77,7 @@ export default function Schedule() {
     const to = new Date(today)
     to.setDate(today.getDate() + 30)
 
-    api.get(`/slots?from=${from.toISOString().slice(0, 10)}&to=${to.toISOString().slice(0, 10)}`)
+    api.get(`/slots?from=${from.toISOString().slice(0, 10)}&to=${to.toISOString().slice(0, 10)}&visible_only=1`)
       .then(setSlots)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -112,41 +89,6 @@ export default function Schedule() {
       api.get('/bookings').then(data => setMyBookings(data.bookings || [])).catch(() => {})
     }
   }, [user])
-
-  const handleApproveSlot = async (slotId) => {
-    try {
-      const requests = await api.get(`/booking-requests?slot_id=${slotId}&status=pending`)
-      const req = (Array.isArray(requests) ? requests : []).find(r => r.kind === 'new_booking')
-      if (req) {
-        await api.put(`/booking-requests/${req.id}/decide`, { decision: 'approved' })
-        fetchSlots()
-      }
-    } catch {}
-  }
-
-  const handleDenySlot = async (slotId) => {
-    try {
-      const requests = await api.get(`/booking-requests?slot_id=${slotId}&status=pending`)
-      const req = (Array.isArray(requests) ? requests : []).find(r => r.kind === 'new_booking')
-      if (req) {
-        await api.put(`/booking-requests/${req.id}/decide`, { decision: 'denied' })
-        fetchSlots()
-      }
-    } catch {}
-  }
-
-  const handleChangeTimeSave = async () => {
-    if (!changeTimeSlot) return
-    try {
-      await api.put(`/slots/${changeTimeSlot.id}`, {
-        date: changeTimeForm.date,
-        time: changeTimeForm.time,
-        court: changeTimeForm.court,
-      })
-      setChangeTimeSlot(null)
-      fetchSlots()
-    } catch {}
-  }
 
   const slotsByDate = useMemo(() => groupSlotsByDate(slots), [slots])
 
@@ -343,29 +285,19 @@ export default function Schedule() {
                             <Clock className="w-3.5 h-3.5 text-lime-400 shrink-0" />
                             {slot.label}
                           </div>
-                          {[slot.slot1, slot.slot2, slot.slot3].map((slotObj, i) => {
+                           {[slot.slot1, slot.slot2, slot.slot3].map((slotObj, i) => {
                             const courtNum = i + 1
                             const player = slotObj?.player_text || ''
                             const isMine = player && mySessionKeys.has(`${scheduleDate}|${slot.time}|${courtNum}`)
-                            const isPending = slotObj?.status === 'pending'
-                            const isConfirmed = slotObj?.status === 'confirmed'
-                            const isBooked = isPending || isConfirmed
                             return (
                                <div key={i} className={`px-4 py-3 border-l border-theme text-xs font-bold text-center flex flex-col items-center justify-center gap-1 ${
-                                isMine ? 'bg-lime-400/15 text-lime-400' : isPending ? 'bg-amber-500/10 text-amber-400' : isBooked ? 'bg-rose-500/10 text-rose-300' : 'bg-lime-400/5 text-lime-400'
+                                isMine ? 'bg-lime-400/15 text-lime-400' : 'bg-lime-400/5 text-lime-400'
                               }`}>
                                 {player || 'Available'}{isMine ? ' ★' : ''}
                                 {player && slotObj?.session_type && (
                                   <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${slotObj.session_type === 'group' ? 'bg-purple-400/20 text-purple-400' : 'bg-blue-400/20 text-blue-400'}`}>
                                     {slotObj.session_type === 'group' ? 'GRP' : 'PVT'}
                                   </span>
-                                )}
-                                {isPending && user && (
-                                  <div className="flex items-center gap-1 mt-0.5">
-                                    <button onClick={() => handleApproveSlot(slotObj.id)} className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30" title="Approve">✓</button>
-                                    <button onClick={() => handleDenySlot(slotObj.id)} className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 border border-rose-500/30" title="Deny">✗</button>
-                                    <button onClick={() => { setChangeTimeSlot(slotObj); setChangeTimeForm({ date: slotObj.date, time: slotObj.time, court: slotObj.court }) }} className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 border border-blue-500/30" title="Change Time">↻</button>
-                                  </div>
                                 )}
                               </div>
                             )
@@ -421,41 +353,6 @@ export default function Schedule() {
               </div>
             )}
           </>
-        )}
-
-        {changeTimeSlot && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-theme/80 backdrop-blur-md">
-            <div className="w-full max-w-sm glass-panel rounded-2xl border border-theme shadow-2xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-theme">Change Time Slot</h3>
-                <button onClick={() => setChangeTimeSlot(null)} className="p-2 text-muted hover:text-theme hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg">✕</button>
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-semibold text-theme uppercase mb-1">Date</label>
-                  <input type="date" value={changeTimeForm.date} onChange={e => setChangeTimeForm({ ...changeTimeForm, date: e.target.value })} className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-theme uppercase mb-1">Time</label>
-                  <select value={changeTimeForm.time} onChange={e => setChangeTimeForm({ ...changeTimeForm, time: e.target.value })} className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs">
-                    {Object.keys(TIME_LABELS).map(t => <option key={t} value={t}>{TIME_LABELS[t]}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-theme uppercase mb-1">Court</label>
-                    <select value={changeTimeForm.court} onChange={e => setChangeTimeForm({ ...changeTimeForm, court: parseInt(e.target.value) })} className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs">
-                    <option value={1}>Court 1</option>
-                    <option value={2}>Court 2</option>
-                    <option value={3}>Court 3</option>
-                  </select>
-                </div>
-              </div>
-              <div className="flex gap-3 mt-4">
-                <button onClick={() => setChangeTimeSlot(null)} className="flex-1 py-2.5 rounded-xl bg-surface border border-theme text-theme text-sm font-semibold">Cancel</button>
-                <button onClick={handleChangeTimeSave} className="flex-1 py-2.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-bold text-sm">Save</button>
-              </div>
-            </div>
-          </div>
         )}
 
         <div className="p-6 rounded-3xl bg-gradient-to-r from-lime-500/10 via-white dark:via-slate-900 to-white dark:to-slate-900 border border-theme flex flex-col sm:flex-row items-center justify-between gap-4">

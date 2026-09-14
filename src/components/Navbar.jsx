@@ -8,6 +8,7 @@ import { api } from '../lib/api'
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showThemeMenu, setShowThemeMenu] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
   const { user, logout, openLoginModal, isAdmin, isCoach } = useAuth()
@@ -34,6 +35,17 @@ export default function Navbar() {
       setUnreadCount(data.unread || 0)
     }).catch(() => {})
   }, [user])
+
+  useEffect(() => {
+    if (!showNotifications) return
+    const handleClick = (e) => {
+      if (!e.target.closest('[data-notif-panel]')) {
+        setShowNotifications(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showNotifications])
 
   const isActive = (path) => {
     if (path === '/' && location.pathname === '/') return true
@@ -119,8 +131,8 @@ export default function Navbar() {
             </div>
 
             {user && (
-              <div className="relative group">
-                <button                 className="relative p-2.5 rounded-xl bg-surface border border-theme text-muted hover:text-theme hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
+              <div className="relative">
+                <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-2.5 rounded-xl bg-surface border border-theme text-muted hover:text-theme hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
                   <Bell className="w-4 h-4" />
                   {unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
@@ -128,39 +140,42 @@ export default function Navbar() {
                     </span>
                   )}
                 </button>
-                <div className="invisible group-hover:visible absolute right-0 top-full mt-2 w-80 bg-surface border border-theme rounded-xl shadow-2xl z-50 max-h-96 overflow-y-auto">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-theme">
-                    <span className="text-xs font-bold text-theme">Notifications</span>
-                    {unreadCount > 0 && (
-                      <button onClick={markAllRead} className="text-[10px] text-lime-400 font-semibold hover:underline">Mark all read</button>
+                {showNotifications && (
+                  <div data-notif-panel className="absolute right-0 top-full mt-2 w-80 bg-surface border border-theme rounded-xl shadow-2xl z-50 max-h-96 overflow-y-auto">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-theme">
+                      <span className="text-xs font-bold text-theme">Notifications</span>
+                      {unreadCount > 0 && (
+                        <button onClick={markAllRead} className="text-[10px] text-lime-400 font-semibold hover:underline">Mark all read</button>
+                      )}
+                    </div>
+                    {notifications.length === 0 ? (
+                      <p className="px-4 py-6 text-xs text-muted text-center">No notifications</p>
+                    ) : (
+                      notifications.slice(0, 10).map(n => (
+                        <button
+                          key={n.id}
+                          onClick={() => {
+                            if (!n.read) {
+                              api.put(`/notifications/${n.id}/read`).then(() => {
+                                setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: 1 } : x))
+                                setUnreadCount(prev => Math.max(0, prev - 1))
+                              }).catch(() => {})
+                            }
+                            if (n.link) {
+                              setShowNotifications(false)
+                              navigate(n.link)
+                            }
+                          }}
+                          className={`w-full text-left px-4 py-3 border-b border-theme hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors ${!n.read ? 'bg-lime-400/5' : ''}`}
+                        >
+                          <p className="text-xs font-bold text-theme">{n.title}</p>
+                          <p className="text-[11px] text-muted mt-0.5">{n.body}</p>
+                          <p className="text-[10px] text-muted mt-1">{n.created_at?.slice(0, 16)}</p>
+                        </button>
+                      ))
                     )}
                   </div>
-                  {notifications.length === 0 ? (
-                    <p className="px-4 py-6 text-xs text-muted text-center">No notifications</p>
-                  ) : (
-                    notifications.slice(0, 10).map(n => (
-                      <button
-                        key={n.id}
-                        onClick={() => {
-                          if (!n.read) {
-                            api.put(`/notifications/${n.id}/read`).then(() => {
-                              setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: 1 } : x))
-                              setUnreadCount(prev => Math.max(0, prev - 1))
-                            }).catch(() => {})
-                          }
-                          if (n.link) {
-                            navigate(n.link)
-                          }
-                        }}
-                        className={`w-full text-left px-4 py-3 border-b border-theme hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors ${!n.read ? 'bg-lime-400/5' : ''}`}
-                      >
-                        <p className="text-xs font-bold text-theme">{n.title}</p>
-                        <p className="text-[11px] text-muted mt-0.5">{n.body}</p>
-                        <p className="text-[10px] text-muted mt-1">{n.created_at?.slice(0, 16)}</p>
-                      </button>
-                    ))
-                  )}
-                </div>
+                )}
               </div>
             )}
 

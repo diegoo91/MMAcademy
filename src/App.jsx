@@ -20,6 +20,7 @@ import Comments from './pages/admin/Comments'
 import ScheduleManager from './pages/admin/ScheduleManager'
 import Expenses from './pages/admin/Expenses'
 import Reports from './pages/admin/Reports'
+import Payments from './pages/admin/Payments'
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth()
@@ -96,6 +97,11 @@ function AppRoutes() {
           <Route path="reports" element={
             <ProtectedRoute roles={['superadmin', 'admin']}>
               <Reports />
+            </ProtectedRoute>
+          } />
+          <Route path="payments" element={
+            <ProtectedRoute roles={['superadmin', 'admin']}>
+              <Payments />
             </ProtectedRoute>
           } />
         </Route>

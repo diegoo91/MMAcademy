@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { AlertCircle, CheckCircle2, Edit, Key, Plus, Shield, Trash2, X, ArrowRightLeft } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Edit, Key, Plus, Search, Shield, Trash2, X, ArrowRightLeft } from 'lucide-react'
 import { api } from '../../lib/api'
 
 function ConvertModal({ user, onClose, onDone }) {
@@ -244,6 +244,7 @@ export default function Users() {
   const [resetConfirm, setResetConfirm] = useState(null)
   const [resetResult, setResetResult] = useState(null)
   const [convertUser, setConvertUser] = useState(null)
+  const [search, setSearch] = useState('')
 
   const fetchUsers = () => {
     setLoading(true)
@@ -251,6 +252,12 @@ export default function Users() {
   }
 
   useEffect(() => { fetchUsers() }, [])
+
+  const filteredUsers = users.filter(u => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return (u.name || '').toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.phone && u.phone.includes(q))
+  })
 
   const handleDelete = async (id) => {
     try { await api.del(`/users/${id}`); setDeleteConfirm(null); fetchUsers() } catch {}
@@ -269,11 +276,27 @@ export default function Users() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-heading text-3xl font-black text-theme">Users</h1>
-          <p className="text-muted text-sm mt-1">{users.length} system users with role-based access</p>
+          <p className="text-muted text-sm mt-1">{filteredUsers.length} of {users.length} users</p>
         </div>
         <button onClick={() => setShowAdd(true)} className="px-4 py-2.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 text-sm font-bold flex items-center gap-2">
           <Plus className="w-4 h-4" /> Create User
         </button>
+      </div>
+
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search users..."
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface border border-theme text-theme text-sm focus:outline-none focus:border-lime-400"
+        />
+        {search && (
+          <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted hover:text-theme rounded-lg">
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -288,14 +311,20 @@ export default function Users() {
                   <th className="text-left px-6 py-4 font-semibold">Email</th>
                   <th className="text-left px-6 py-4 font-semibold">Role</th>
                   <th className="text-left px-6 py-4 font-semibold">Joined</th>
-                  <th className="text-center px-6 py-4 font-semibold">Used Sessions</th>
-                  <th className="text-center px-6 py-4 font-semibold">Private Bal.</th>
-                  <th className="text-center px-6 py-4 font-semibold">Group Bal.</th>
+                  <th className="text-center px-6 py-4 font-semibold">Used</th>
+                  <th className="text-center px-6 py-4 font-semibold">Rem. Private</th>
+                  <th className="text-center px-6 py-4 font-semibold">Rem. Group</th>
                   <th className="text-right px-6 py-4 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-theme">
-                {users.map(u => (
+                {filteredUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-12 text-center text-muted text-sm">
+                      {search ? 'No users match your search.' : 'No users found.'}
+                    </td>
+                  </tr>
+                ) : filteredUsers.map(u => (
                   <tr key={u.id} className="hover:bg-white/50 dark:hover:bg-slate-900/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">

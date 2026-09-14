@@ -20,7 +20,7 @@ router.get('/summary', (req, res) => {
     }
 
     const allBookings = db.findAll('bookings')
-    let paidBookings = allBookings.filter(b => b.paid || b.status === 'confirmed' || b.status === 'completed')
+    let paidBookings = allBookings.filter(b => b.status === 'player_confirmed' || b.status === 'payment_approved' || b.status === 'schedule_approved')
     if (rangeFrom) paidBookings = paidBookings.filter(b => {
       const paidDate = b.paidAt || b.updated_at || b.created_at
       return paidDate && paidDate.slice(0, 10) >= rangeFrom
@@ -38,6 +38,16 @@ router.get('/summary', (req, res) => {
         session_type: b.session_type, status: b.status, paid: !!b.paid,
       }
     })
+
+    let standalonePayments = db.findAll('payments')
+    if (rangeFrom) standalonePayments = standalonePayments.filter(p => p.date >= rangeFrom)
+    if (rangeTo) standalonePayments = standalonePayments.filter(p => p.date <= rangeTo)
+    const mappedStandalone = standalonePayments.map(p => ({
+      id: 'pay-' + p.id, ref: p.ref, date: p.date,
+      player: p.player_name, amount: Number(p.amount) || 0,
+      session_type: p.method, status: 'paid', paid: true,
+    }))
+    const allPayments = [...payments, ...mappedStandalone]
 
     let allSlots = db.findAll('slots')
     if (rangeFrom) allSlots = allSlots.filter(s => s.date >= rangeFrom)
@@ -102,11 +112,11 @@ router.get('/summary', (req, res) => {
     if (rangeFrom) expenses = expenses.filter(e => e.date >= rangeFrom)
     if (rangeTo) expenses = expenses.filter(e => e.date <= rangeTo)
 
-    const totalRevenue = payments.reduce((s, p) => s + p.amount, 0)
+    const totalRevenue = allPayments.reduce((s, p) => s + p.amount, 0)
     const totalExpenses = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0)
 
     res.json({
-      payments, scheduleHistory, sessionsPerPlayer, matchResults,
+      payments: allPayments, scheduleHistory, sessionsPerPlayer, matchResults,
       profit: { revenue: totalRevenue, expenses: totalExpenses, net: totalRevenue - totalExpenses },
       range: { from: rangeFrom, to: rangeTo, preset: preset || 'custom' },
     })

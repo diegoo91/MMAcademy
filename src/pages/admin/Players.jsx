@@ -380,9 +380,9 @@ export default function Players() {
                   <th className="text-left px-6 py-4 font-semibold">Phone</th>
                   <th className="text-left px-6 py-4 font-semibold">Skill</th>
                   <th className="text-left px-6 py-4 font-semibold">Position</th>
-                  <th className="text-center px-6 py-4 font-semibold">Used Sessions</th>
-                  <th className="text-center px-6 py-4 font-semibold">Private Bal.</th>
-                  <th className="text-center px-6 py-4 font-semibold">Group Bal.</th>
+                  <th className="text-center px-6 py-4 font-semibold">Used</th>
+                  <th className="text-center px-6 py-4 font-semibold">All Private</th>
+                  <th className="text-center px-6 py-4 font-semibold">All Group</th>
                   <th className="text-left px-6 py-4 font-semibold">Joined</th>
                   <th className="text-right px-6 py-4 font-semibold">Actions</th>
                 </tr>
@@ -419,16 +419,16 @@ export default function Players() {
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-full text-xs font-bold ${
-                        (p.private_balance || 0) > 0 ? 'bg-lime-400/15 text-lime-400' : 'bg-surface/80 text-muted'
+                        (p.total_private || 0) > 0 ? 'bg-lime-400/15 text-lime-400' : 'bg-surface/80 text-muted'
                       }`}>
-                        {p.private_balance || 0}
+                        {p.total_private || 0}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span className={`inline-flex items-center justify-center min-w-[28px] px-2 py-0.5 rounded-full text-xs font-bold ${
-                        (p.group_balance || 0) > 0 ? 'bg-purple-400/15 text-purple-400' : 'bg-surface/80 text-muted'
+                        (p.total_group || 0) > 0 ? 'bg-purple-400/15 text-purple-400' : 'bg-surface/80 text-muted'
                       }`}>
-                        {p.group_balance || 0}
+                        {p.total_group || 0}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-muted text-xs">{new Date(p.created_at).toLocaleDateString()}</td>
