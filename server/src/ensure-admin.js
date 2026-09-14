@@ -3,7 +3,7 @@
 // Used on Railway so a login is always available after a fresh deploy.
 
 import bcrypt from 'bcryptjs'
-import db from '../database.js'
+import db from './database.js'
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@mmpadel.com'
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD

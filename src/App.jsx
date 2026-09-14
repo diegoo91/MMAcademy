@@ -173,7 +173,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <BrowserRouter basename="/MMAcademy">
+        <BrowserRouter basename={import.meta.env.PROD ? '/MMAcademy' : ''}>
           <AppRoutes />
         </BrowserRouter>
       </AuthProvider>

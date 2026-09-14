@@ -1,4 +1,11 @@
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5174/api'
+const API_ORIGIN = API_BASE.replace(/\/api\/?$/, '')
+
+export function fileUrl(path) {
+  if (!path) return ''
+  if (path.startsWith('http://') || path.startsWith('https://')) return path
+  return `${API_ORIGIN}${path}`
+}
 
 let accessToken = null
 

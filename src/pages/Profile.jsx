@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Camera, Clock, Mail, Phone, Shield, ArrowRightLeft, Calendar, Trophy, AlertTriangle, CheckCircle, XCircle, Key } from 'lucide-react'
-import { api } from '../lib/api'
+import { api, fileUrl } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 
 export default function Profile() {
@@ -173,7 +173,7 @@ export default function Profile() {
             <div className="relative group">
               <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-lime-400/60 bg-surface">
                 {user.avatar ? (
-                  <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                  <img src={fileUrl(user.avatar)} alt={user.name} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-lime-400 text-3xl font-bold">
                     {user.name?.charAt(0)}
