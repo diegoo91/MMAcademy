@@ -3,6 +3,13 @@ name: Deploy Frontend to GitHub Pages
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'index.html'
+      - 'vite.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 permissions:
@@ -12,7 +19,7 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -37,6 +44,9 @@ jobs:
 
       - name: Copy index.html to 404.html for SPA deep links
         run: cp dist/index.html dist/404.html
+
+      - name: List dist contents
+        run: ls -la dist/ && ls -la dist/assets/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
