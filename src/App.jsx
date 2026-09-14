@@ -173,7 +173,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <BrowserRouter basename="/mmacademy">
+        <BrowserRouter basename="/MMAcademy">
           <AppRoutes />
         </BrowserRouter>
       </AuthProvider>

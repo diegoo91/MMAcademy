@@ -4,7 +4,7 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: '/mmacademy/',
+  base: '/MMAcademy/',
   server: {
     port: 5173,
   },
