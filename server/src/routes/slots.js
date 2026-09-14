@@ -50,6 +50,15 @@ function findPlayerUser(playerText) {
   return db.find('users', u => u.role === 'player' && u.name && u.name.toLowerCase() === name.toLowerCase())
 }
 
+function getBalanceInfo(player) {
+  if (!player) return null
+  return {
+    name: player.name,
+    private_balance: player.private_balance || 0,
+    group_balance: player.group_balance || 0,
+  }
+}
+
 function findPlayerUserById(userId) {
   if (!userId) return null
   return db.get('users', userId)
@@ -109,7 +118,7 @@ router.put('/:id', requireRole('superadmin', 'admin'), (req, res) => {
     const id = parseInt(req.params.id)
     const slot = db.get('slots', id)
     if (!slot) return res.status(404).json({ error: 'Slot not found' })
-    const { player_text, date, time, court, session_type, status } = req.body
+    const { player_text, date, time, court, session_type, status, balanceOverride } = req.body
     const err = validateLength('Player', player_text, LIMITS.playerText)
     if (err) return res.status(400).json({ error: err })
     const newDate = date || slot.date
@@ -137,8 +146,45 @@ router.put('/:id', requireRole('superadmin', 'admin'), (req, res) => {
         const player = findPlayerUser(player_text)
         if (player) {
           updates.user_id = player.id
-          const ok = deductBalance(player.id, session_type || slot.session_type || 'private')
-          if (!ok) return res.status(400).json({ error: `Insufficient balance for ${player.name}` })
+          const stype = session_type || slot.session_type || 'private'
+          const balanceInfo = getBalanceInfo(player)
+          const needed = stype === 'private' ? player.private_balance <= 0 : player.group_balance <= 0
+          if (needed && !balanceInfo[stype + '_balance']) {
+            // Balance insufficient
+            if (balanceOverride === 'free') {
+              // Bonus session — create slot confirmed, no deduction
+            } else if (balanceOverride === 'deduct') {
+              // Allow negative balance
+              if (stype === 'private') db.update('users', player.id, { private_balance: (player.private_balance || 0) - 1 })
+              else db.update('users', player.id, { group_balance: (player.group_balance || 0) - 1 })
+            } else {
+              return res.status(409).json({
+                code: 'INSUFFICIENT_BALANCE',
+                player: player.name,
+                sessionType: stype,
+                remaining: balanceInfo[stype + '_balance'],
+                needed: 1,
+              })
+            }
+          } else {
+            const ok = deductBalance(player.id, stype)
+            if (!ok) {
+              if (balanceOverride === 'free') {
+                // Bonus session — no deduction
+              } else if (balanceOverride === 'deduct') {
+                if (stype === 'private') db.update('users', player.id, { private_balance: (player.private_balance || 0) - 1 })
+                else db.update('users', player.id, { group_balance: (player.group_balance || 0) - 1 })
+              } else {
+                return res.status(409).json({
+                  code: 'INSUFFICIENT_BALANCE',
+                  player: player.name,
+                  sessionType: stype,
+                  remaining: balanceInfo[stype + '_balance'],
+                  needed: 1,
+                })
+              }
+            }
+          }
         }
       }
     }
@@ -160,7 +206,7 @@ router.put('/:id', requireRole('superadmin', 'admin'), (req, res) => {
 // POST / — create slot (admin manual)
 router.post('/', requireRole('superadmin', 'admin'), (req, res) => {
   try {
-    const { date, time, court, player_text, session_type } = req.body
+    const { date, time, court, player_text, session_type, balanceOverride } = req.body
     if (!date || !time || !court) return res.status(400).json({ error: 'Date, time, and court are required' })
     const err = validateLength('Player', player_text, LIMITS.playerText)
     if (err) return res.status(400).json({ error: err })
@@ -172,8 +218,43 @@ router.post('/', requireRole('superadmin', 'admin'), (req, res) => {
     if (hasPlayer) {
       const player = findPlayerUser(player_text)
       if (player) {
-        const ok = deductBalance(player.id, slotSessionType)
-        if (!ok) return res.status(400).json({ error: `Insufficient balance for ${player.name}` })
+        const balanceInfo = getBalanceInfo(player)
+        const hasEnough = (slotSessionType === 'private' && (player.private_balance || 0) > 0) ||
+                          (slotSessionType === 'group' && (player.group_balance || 0) > 0)
+        if (!hasEnough) {
+          if (balanceOverride === 'free') {
+            // Bonus session — create slot confirmed, no deduction
+          } else if (balanceOverride === 'deduct') {
+            if (slotSessionType === 'private') db.update('users', player.id, { private_balance: (player.private_balance || 0) - 1 })
+            else db.update('users', player.id, { group_balance: (player.group_balance || 0) - 1 })
+          } else {
+            return res.status(409).json({
+              code: 'INSUFFICIENT_BALANCE',
+              player: player.name,
+              sessionType: slotSessionType,
+              remaining: balanceInfo[slotSessionType + '_balance'],
+              needed: 1,
+            })
+          }
+        } else {
+          const ok = deductBalance(player.id, slotSessionType)
+          if (!ok) {
+            if (balanceOverride === 'free') {
+              // Bonus session — no deduction
+            } else if (balanceOverride === 'deduct') {
+              if (slotSessionType === 'private') db.update('users', player.id, { private_balance: (player.private_balance || 0) - 1 })
+              else db.update('users', player.id, { group_balance: (player.group_balance || 0) - 1 })
+            } else {
+              return res.status(409).json({
+                code: 'INSUFFICIENT_BALANCE',
+                player: player.name,
+                sessionType: slotSessionType,
+                remaining: balanceInfo[slotSessionType + '_balance'],
+                needed: 1,
+              })
+            }
+          }
+        }
         const slot = db.insert('slots', { date, time, court, player_text, session_type: slotSessionType, status: STATUS.PLAYER_CONFIRMED, booking_id: null, user_id: player.id })
         return res.status(201).json(slot)
       }

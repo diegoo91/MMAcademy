@@ -55,6 +55,7 @@ export default function ScheduleManager() {
   const [importing, setImporting] = useState(false)
   const [uploadMessage, setUploadMessage] = useState(null)
   const [balanceWarning, setBalanceWarning] = useState(null)
+  const [pendingOverride, setPendingOverride] = useState(null)
   const [dayActionLoading, setDayActionLoading] = useState(null)
 
   const fetchSlots = () => {
@@ -221,7 +222,19 @@ export default function ScheduleManager() {
       setAddPartner('')
       setSelectedPlayer(null)
       fetchSlots()
-    } catch {}
+    } catch (err) {
+      const msg = err.message || ''
+      if (msg.includes('INSUFFICIENT_BALANCE') || msg.includes('409')) {
+        const payload = { ...addForm }
+        if (addForm.session_type === 'group' && addPartner.trim()) {
+          payload.player_text = `${addForm.player_text} / ${addPartner.trim()}`
+        }
+        const player = selectedPlayer?.full_name || addForm.player_text
+        const stype = addForm.session_type || 'private'
+        const remaining = selectedPlayer ? (selectedPlayer[stype + '_balance'] || 0) : 0
+        setPendingOverride({ payload, player, sessionType: stype, remaining })
+      }
+    }
   }
 
   const handleConvertAction = async (id, action) => {
@@ -229,6 +242,22 @@ export default function ScheduleManager() {
       await api.put(`/conversion-requests/${id}/${action}`)
       fetchConversionRequests()
     } catch {}
+  }
+
+  const handleOverrideConfirm = async (mode) => {
+    if (!pendingOverride) return
+    const payload = { ...pendingOverride.payload, balanceOverride: mode }
+    try {
+      await api.post('/slots', payload)
+      setPendingOverride(null)
+      setAddSlot(null)
+      setAddForm({ date: '', time: '15:00', court: 1, player_text: '', session_type: null })
+      setAddPartner('')
+      setSelectedPlayer(null)
+      fetchSlots()
+    } catch (err) {
+      alert(err.message || 'Failed to add slot')
+    }
   }
 
   const handleUploadFile = async () => {
@@ -670,6 +699,26 @@ export default function ScheduleManager() {
           </div>
         </div>
       )}
+
+      {pendingOverride && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md">
+          <div className="w-full max-w-sm glass-panel rounded-2xl border border-theme shadow-2xl p-6 text-center">
+            <div className="w-12 h-12 rounded-full mx-auto mb-4 flex items-center justify-center bg-amber-500/20">
+              <span className="text-amber-400 text-2xl font-bold">!</span>
+            </div>
+            <h3 className="text-lg font-bold text-theme mb-2">Insufficient Balance</h3>
+            <p className="text-muted text-sm mb-4">
+              {pendingOverride.player} has {pendingOverride.remaining} remaining {pendingOverride.sessionType} session(s), needs 1.
+              Add this slot anyway as a <span className="text-lime-400 font-bold">free/bonus session</span>?
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setPendingOverride(null)} className="flex-1 py-2.5 rounded-xl bg-surface border border-theme text-theme text-sm font-semibold">Cancel</button>
+              <button onClick={() => handleOverrideConfirm('free')} className="flex-1 py-2.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-bold text-sm">Add Free</button>
+              <button onClick={() => handleOverrideConfirm('deduct')} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-white font-bold text-sm">Deduct Anyway</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -679,18 +728,48 @@ function EditSlotModal({ slot, onClose, onSaved }) {
   const [form, setForm] = useState({ player_text: existingParts[0] || '', date: slot.date, time: slot.time, court: slot.court, session_type: slot.session_type || null })
   const [partner, setPartner] = useState(existingParts[1] || '')
   const [loading, setLoading] = useState(false)
+  const [pendingOverride, setPendingOverride] = useState(null)
 
-  const handleSave = async () => {
+  const handleSave = async (balanceOverride) => {
     setLoading(true)
     try {
       const payload = { ...form }
       if (form.session_type === 'group' && partner.trim()) {
         payload.player_text = `${form.player_text} / ${partner.trim()}`
       }
+      if (balanceOverride) payload.balanceOverride = balanceOverride
       await api.put(`/slots/${slot.id}`, payload)
       onSaved()
-    } catch {}
+    } catch (err) {
+      const msg = err.message || ''
+      if (msg.includes('INSUFFICIENT_BALANCE') || msg.includes('409')) {
+        const stype = form.session_type || 'private'
+        setPendingOverride({
+          player: form.player_text,
+          sessionType: stype,
+          remaining: 0,
+        })
+      } else {
+        alert(err.message || 'Failed to save')
+      }
+    }
     setLoading(false)
+  }
+
+  const handleOverrideConfirm = async (mode) => {
+    if (!pendingOverride) return
+    const payload = { ...form }
+    if (form.session_type === 'group' && partner.trim()) {
+      payload.player_text = `${form.player_text} / ${partner.trim()}`
+    }
+    payload.balanceOverride = mode
+    try {
+      await api.put(`/slots/${slot.id}`, payload)
+      setPendingOverride(null)
+      onSaved()
+    } catch (err) {
+      alert(err.message || 'Failed to save')
+    }
   }
 
   return (
@@ -746,11 +825,31 @@ function EditSlotModal({ slot, onClose, onSaved }) {
         </div>
         <div className="flex gap-3 mt-4">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-surface border border-theme text-theme text-sm font-semibold">Cancel</button>
-          <button onClick={handleSave} disabled={loading} className="flex-1 py-2.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-bold text-sm disabled:opacity-50">
+          <button onClick={() => handleSave()} disabled={loading} className="flex-1 py-2.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-bold text-sm disabled:opacity-50">
             {loading ? 'Saving...' : 'Save'}
           </button>
         </div>
       </div>
+
+      {pendingOverride && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md">
+          <div className="w-full max-w-sm glass-panel rounded-2xl border border-theme shadow-2xl p-6 text-center">
+            <div className="w-12 h-12 rounded-full mx-auto mb-4 flex items-center justify-center bg-amber-500/20">
+              <span className="text-amber-400 text-2xl font-bold">!</span>
+            </div>
+            <h3 className="text-lg font-bold text-theme mb-2">Insufficient Balance</h3>
+            <p className="text-muted text-sm mb-4">
+              {pendingOverride.player} has {pendingOverride.remaining} remaining {pendingOverride.sessionType} session(s), needs 1.
+              Add this slot anyway as a <span className="text-lime-400 font-bold">free/bonus session</span>?
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setPendingOverride(null)} className="flex-1 py-2.5 rounded-xl bg-surface border border-theme text-theme text-sm font-semibold">Cancel</button>
+              <button onClick={() => handleOverrideConfirm('free')} className="flex-1 py-2.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-bold text-sm">Add Free</button>
+              <button onClick={() => handleOverrideConfirm('deduct')} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-white font-bold text-sm">Deduct Anyway</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
