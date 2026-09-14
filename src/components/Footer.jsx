@@ -14,7 +14,7 @@ export default function Footer() {
           <div className="space-y-4">
             <Link to="/" className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-lime-400/80 shadow-lg shadow-lime-400/20 bg-surface shrink-0">
-                <img src="/images/logo.jpg" alt="MM Padel Academy Logo" className="w-full h-full object-cover" />
+                <img src={`${import.meta.env.BASE_URL}images/logo.jpg`} alt="MM Padel Academy Logo" className="w-full h-full object-cover" />
               </div>
               <span className="font-heading text-lg font-extrabold text-theme">
                 MM <span className="text-lime-400">PADEL</span> ACADEMY
@@ -109,7 +109,7 @@ export default function Footer() {
             </h4>
             <div className="relative rounded-2xl overflow-hidden border border-theme bg-surface group">
               <img
-                src="/images/court.png"
+                src={`${import.meta.env.BASE_URL}images/court.png`}
                 alt="Map preview"
                 className="w-full h-32 object-cover opacity-60 group-hover:scale-105 transition-transform duration-500 bg-surface"
               />

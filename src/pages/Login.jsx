@@ -47,7 +47,7 @@ export default function Login() {
       <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-lime-400/80 shadow-lg shadow-lime-400/20 mx-auto mb-4 bg-surface">
-            <img src="/images/logo.jpg" alt="MM Padel Academy Logo" className="w-full h-full object-cover" />
+            <img src={`${import.meta.env.BASE_URL}images/logo.jpg`} alt="MM Padel Academy Logo" className="w-full h-full object-cover" />
           </div>
           <h1 className="font-heading text-3xl font-black text-theme">Member Login</h1>
           <p className="text-muted text-sm mt-1">Access your MM Padel Academy portal</p>

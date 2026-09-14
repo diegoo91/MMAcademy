@@ -111,7 +111,7 @@ export default function Home() {
             <div className="lg:col-span-5 relative">
               <div className="relative rounded-3xl overflow-hidden border border-theme shadow-2xl group bg-surface">
                 <img
-                  src="/images/hero.png"
+                  src={`${import.meta.env.BASE_URL}images/hero.png`}
                   alt="MM Padel Academy Court"
                   className="w-full h-[300px] sm:h-[420px] object-cover group-hover:scale-105 transition-transform duration-700"
                 />
@@ -159,7 +159,7 @@ export default function Home() {
             <div className="lg:col-span-5 relative flex justify-center">
               <div className="relative rounded-3xl overflow-hidden border-2 border-lime-400/50 shadow-2xl max-w-sm group">
                 <img
-                  src="/images/pricing.jpg"
+                  src={`${import.meta.env.BASE_URL}images/pricing.jpg`}
                   alt="Official MM Padel Academy Pricing Flyer"
                   className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500"
                 />

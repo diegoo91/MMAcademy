@@ -72,7 +72,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-20">
           <Link to="/" className="flex items-center gap-3 group">
             <div                 className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-lime-400/80 shadow-lg shadow-lime-400/20 group-hover:scale-105 transition-transform bg-surface shrink-0">
-              <img src="/images/logo.jpg" alt="MM Padel Academy Logo" className="w-full h-full object-cover" />
+              <img src={`${import.meta.env.BASE_URL}images/logo.jpg`} alt="MM Padel Academy Logo" className="w-full h-full object-cover" />
             </div>
             <div className="flex flex-col">
               <span className="font-heading text-xl font-extrabold tracking-tight text-theme flex items-center gap-1.5">
