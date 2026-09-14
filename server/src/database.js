@@ -119,6 +119,13 @@ const db = {
   clear(collection) {
     data[collection] = []
     save()
+  },
+
+  replace(newData) {
+    for (const key of Object.keys(DEFAULTS)) {
+      data[key] = Array.isArray(newData[key]) ? newData[key] : []
+    }
+    save()
   }
 }
 

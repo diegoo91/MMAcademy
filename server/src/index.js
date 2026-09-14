@@ -26,6 +26,7 @@ import reportsRoutes from './routes/reports.js'
 import bookingRequestsRoutes from './routes/booking-requests.js'
 import paymentsRoutes from './routes/payments.js'
 import auditLogsRoutes from './routes/audit-logs.js'
+import adminImportDbRoutes from './routes/admin-import-db.js'
 import { ensureAdmin } from './ensure-admin.js'
 
 const app = express()
@@ -96,6 +97,7 @@ app.use('/api/reports', reportsRoutes)
 app.use('/api/booking-requests', actionLimiter, bookingRequestsRoutes)
 app.use('/api/payments', actionLimiter, paymentsRoutes)
 app.use('/api/audit-logs', auditLogsRoutes)
+app.use('/api/admin/import-db', adminImportDbRoutes)
 
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: new Date().toISOString() }))
 
