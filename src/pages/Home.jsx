@@ -47,28 +47,28 @@ export default function Home() {
   const mapsUrl = CONTACT.mapsUrl
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden">
+    <div className="min-h-screen bg-theme text-theme overflow-hidden">
       {/* 1. HERO */}
-      <section className="relative pt-12 pb-24 lg:pt-20 lg:pb-32 overflow-hidden border-b border-slate-200 dark:border-slate-800/60">
+      <section className="relative pt-12 pb-24 lg:pt-20 lg:pb-32 overflow-hidden border-b border-theme/60">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-lime-500/15 rounded-full blur-[140px] pointer-events-none" />
         <div className="absolute top-10 right-10 w-96 h-96 bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/90 dark:bg-slate-900/90 border border-lime-400/40 text-lime-400 text-xs font-extrabold uppercase tracking-widest shadow-lg shadow-lime-400/10">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface/90 border border-lime-400/40 text-lime-400 text-xs font-extrabold uppercase tracking-widest shadow-lg shadow-lime-400/10">
                 <Flame className="w-4 h-4 fill-lime-400 text-lime-400 animate-pulse" />
                 <span>Train &bull; Improve &bull; Compete</span>
               </div>
 
-              <h1 className="font-heading text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white leading-tight tracking-tight">
+              <h1 className="font-heading text-4xl sm:text-5xl lg:text-6xl font-black text-theme leading-tight tracking-tight">
                 ELEVATE YOUR GAME AT{' '}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-lime-400 via-lime-300 to-emerald-400">
                   MM PADEL ACADEMY
                 </span>
               </h1>
 
-              <p className="text-lg sm:text-xl text-slate-600 dark:text-slate-300 max-w-2xl font-normal leading-relaxed mx-auto lg:mx-0">
+              <p className="text-lg sm:text-xl text-theme max-w-2xl font-normal leading-relaxed mx-auto lg:mx-0">
                 Professional padel coaching across our 2 dedicated courts &mdash; private coaching and group
                 classes, 1-hour sessions, Sunday to Thursday, 3:00 PM to 11:00 PM.
               </p>
@@ -85,14 +85,14 @@ export default function Home() {
 
                 <Link
                   to={user ? '/profile' : '/book'}
-                  className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-white dark:bg-slate-900/90 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-900 dark:text-white font-extrabold text-base border border-slate-300 dark:border-slate-700 transition-all flex items-center justify-center gap-3 hover:border-lime-400/50"
+                  className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-surface hover:bg-slate-100 dark:hover:bg-slate-800 text-theme font-extrabold text-base border border-theme transition-all flex items-center justify-center gap-3 hover:border-lime-400/50"
                 >
                   <UserPlus className="w-5 h-5 text-lime-400" />
                   <span>{user ? 'View Profile' : 'Join Academy'}</span>
                 </Link>
               </div>
 
-              <div className="pt-6 flex flex-wrap items-center justify-center lg:justify-start gap-x-6 gap-y-2 text-xs text-slate-500 dark:text-slate-400 font-medium">
+              <div className="pt-6 flex flex-wrap items-center justify-center lg:justify-start gap-x-6 gap-y-2 text-xs text-muted font-medium">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-lime-400" />
                   <span>Sun &ndash; Thu (3 PM &ndash; 11 PM)</span>
@@ -109,7 +109,7 @@ export default function Home() {
             </div>
 
             <div className="lg:col-span-5 relative">
-              <div className="relative rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-2xl group bg-white dark:bg-slate-900">
+              <div className="relative rounded-3xl overflow-hidden border border-theme shadow-2xl group bg-surface">
                 <img
                   src="/images/hero.png"
                   alt="MM Padel Academy Court"
@@ -117,12 +117,12 @@ export default function Home() {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
 
-                <div className="absolute bottom-6 left-6 right-6 p-4 rounded-2xl glass-panel border border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
+                <div className="absolute bottom-6 left-6 right-6 p-4 rounded-2xl glass-panel border border-theme/60 flex items-center justify-between">
                   <div>
                     <span className="text-xs font-bold text-lime-400 uppercase tracking-wider">
                       Private &amp; Group Packages
                     </span>
-                    <p className="text-slate-900 dark:text-white font-extrabold text-sm mt-0.5">From 500 EGP / session</p>
+                    <p className="text-theme font-extrabold text-sm mt-0.5">From 500 EGP / session</p>
                   </div>
                   <Link
                     to="/book"
@@ -143,8 +143,8 @@ export default function Home() {
                   <div className="w-10 h-10 mb-3 rounded-xl bg-lime-400/10 text-lime-400 flex items-center justify-center font-bold">
                     <Icon className="w-5 h-5" />
                   </div>
-                  <div className="font-heading text-3xl font-black text-slate-900 dark:text-white">{stat.value}</div>
-                  <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wider">{stat.label}</div>
+                  <div className="font-heading text-3xl font-black text-theme">{stat.value}</div>
+                  <div className="text-xs font-semibold text-muted mt-1 uppercase tracking-wider">{stat.label}</div>
                 </div>
               )
             })}
@@ -153,7 +153,7 @@ export default function Home() {
       </section>
 
       {/* 2. PRICING FLYER SHOWCASE */}
-      <section className="py-20 bg-slate-100/40 dark:bg-slate-900/40 relative border-b border-slate-200 dark:border-slate-800/60">
+      <section className="py-20 bg-slate-100/40 dark:bg-slate-900/40 relative border-b border-theme/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             <div className="lg:col-span-5 relative flex justify-center">
@@ -177,65 +177,65 @@ export default function Home() {
                 <span>Official Academy Rates</span>
               </div>
 
-              <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white leading-tight">
+              <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-theme leading-tight">
                 Transparent Package Pricing Designed for Every Player
               </h2>
 
-              <p className="text-slate-600 dark:text-slate-300 text-base leading-relaxed">
+              <p className="text-theme text-base leading-relaxed">
                 All training sessions are <strong>1 Hour</strong> in duration and priced{' '}
                 <strong>per player</strong>. Training days run weekly from{' '}
                 <strong>Sunday to Thursday (3:00 PM &ndash; 11:00 PM)</strong>.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                <div className="p-5 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 space-y-3">
-                  <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-2">
-                    <h4 className="font-heading font-extrabold text-slate-900 dark:text-white text-base">Private Coaching</h4>
+                <div className="p-5 rounded-2xl bg-surface border border-theme space-y-3">
+                  <div className="flex justify-between items-center border-b border-theme pb-2">
+                    <h4 className="font-heading font-extrabold text-theme text-base">Private Coaching</h4>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-lime-400/20 text-lime-400">1-on-1</span>
                   </div>
                   <ul className="space-y-2 text-xs">
-                    <li className="flex justify-between text-slate-600 dark:text-slate-300">
+                    <li className="flex justify-between text-theme">
                       <span>1 Session:</span>
-                      <strong className="text-slate-900 dark:text-white">1,000 EGP</strong>
+                      <strong className="text-theme">1,000 EGP</strong>
                     </li>
-                    <li className="flex justify-between text-slate-600 dark:text-slate-300">
+                    <li className="flex justify-between text-theme">
                       <span>4 Sessions:</span>
                       <strong className="text-lime-400">3,600 EGP</strong>
                     </li>
-                    <li className="flex justify-between text-slate-600 dark:text-slate-300">
+                    <li className="flex justify-between text-theme">
                       <span>8 Sessions:</span>
                       <strong className="text-lime-400 font-extrabold">7,000 EGP</strong>
                     </li>
-                    <li className="flex justify-between text-slate-600 dark:text-slate-300">
+                    <li className="flex justify-between text-theme">
                       <span>12 Sessions:</span>
                       <strong className="text-lime-400">10,800 EGP</strong>
                     </li>
-                    <li className="flex justify-between text-slate-600 dark:text-slate-300">
+                    <li className="flex justify-between text-theme">
                       <span>16 Sessions:</span>
                       <strong className="text-lime-400 font-extrabold">14,000 EGP</strong>
                     </li>
                   </ul>
                 </div>
 
-                <div className="p-5 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 space-y-3">
-                  <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-2">
-                    <h4 className="font-heading font-extrabold text-slate-900 dark:text-white text-base">Group (2 Persons)</h4>
+                <div className="p-5 rounded-2xl bg-surface border border-theme space-y-3">
+                  <div className="flex justify-between items-center border-b border-theme pb-2">
+                    <h4 className="font-heading font-extrabold text-theme text-base">Group (2 Persons)</h4>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-600 dark:text-purple-300">Group</span>
                   </div>
                   <ul className="space-y-2 text-xs">
-                    <li className="flex justify-between text-slate-600 dark:text-slate-300">
+                    <li className="flex justify-between text-theme">
                       <span>1 Session:</span>
-                      <strong className="text-slate-900 dark:text-white">500 EGP</strong>
+                      <strong className="text-theme">500 EGP</strong>
                     </li>
-                    <li className="flex justify-between text-slate-600 dark:text-slate-300">
+                    <li className="flex justify-between text-theme">
                       <span>4 Sessions:</span>
                       <strong className="text-lime-400">1,800 EGP</strong>
                     </li>
-                    <li className="flex justify-between text-slate-600 dark:text-slate-300">
+                    <li className="flex justify-between text-theme">
                       <span>8 Sessions:</span>
                       <strong className="text-lime-400 font-extrabold">3,500 EGP</strong>
                     </li>
-                    <li className="flex justify-between text-slate-600 dark:text-slate-300">
+                    <li className="flex justify-between text-theme">
                       <span>16 Sessions:</span>
                       <strong className="text-lime-400 font-extrabold">7,000 EGP</strong>
                     </li>
@@ -258,25 +258,25 @@ export default function Home() {
       </section>
 
       {/* 3. PROGRAMS */}
-      <section id="coaches" className="py-20 relative border-b border-slate-200 dark:border-slate-800/60">
+      <section id="coaches" className="py-20 relative border-b border-theme/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto space-y-4 mb-16">
             <span className="text-xs font-extrabold uppercase tracking-widest text-lime-400">
               Training Programs
             </span>
-            <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
+            <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-theme">
               Tailored Programs for Every Level
             </h2>
-            <p className="text-slate-500 dark:text-slate-400 text-base">
+            <p className="text-muted text-base">
               Private coaching or group classes &mdash; pick the path that fits your game.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             {PROGRAMS.map((program) => (
-              <div key={program.id} className="glass-card rounded-2xl overflow-hidden flex flex-col justify-between group bg-white/60 dark:bg-slate-900/60">
+              <div key={program.id} className="glass-card rounded-2xl overflow-hidden flex flex-col justify-between group bg-surface/60 dark:bg-slate-900/60">
                 <div>
-                  <div className="relative h-48 overflow-hidden bg-slate-200 dark:bg-slate-900">
+                  <div className="relative h-48 overflow-hidden bg-surface border-theme">
                     <img
                       src={program.image}
                       alt={program.title}
@@ -291,18 +291,18 @@ export default function Home() {
                   </div>
 
                   <div className="p-5 space-y-3">
-                    <h3 className="font-heading font-extrabold text-lg text-slate-900 dark:text-white group-hover:text-lime-400 transition-colors">
+                    <h3 className="font-heading font-extrabold text-lg text-theme group-hover:text-lime-400 transition-colors">
                       {program.title}
                     </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">{program.description}</p>
+                    <p className="text-xs text-muted line-clamp-2 leading-relaxed">{program.description}</p>
 
-                    <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 text-[11px] text-lime-400 font-semibold">
+                    <div className="p-2.5 rounded-xl bg-surface border border-theme text-[11px] text-lime-400 font-semibold">
                       {program.packages}
                     </div>
 
-                    <ul className="space-y-2 pt-2 border-t border-slate-200/80 dark:border-slate-800/80">
+                    <ul className="space-y-2 pt-2 border-t border-theme/80">
                       {program.features.map((feat, fIdx) => (
-                        <li key={fIdx} className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                        <li key={fIdx} className="text-xs text-theme flex items-center gap-2">
                           <CheckCircle2 className="w-3.5 h-3.5 text-lime-400 shrink-0" />
                           <span>{feat}</span>
                         </li>
@@ -314,7 +314,7 @@ export default function Home() {
                 <div className="p-5 pt-0">
                   <Link
                     to="/book"
-                    className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 hover:bg-lime-400 hover:text-slate-950 text-slate-900 dark:text-white font-bold text-xs transition-all border border-slate-300 dark:border-slate-700 hover:border-lime-400 flex items-center justify-center gap-2"
+                    className="w-full py-2.5 rounded-xl bg-surface hover:bg-lime-400 hover:text-slate-950 text-theme font-bold text-xs transition-all border border-theme hover:border-lime-400 flex items-center justify-center gap-2"
                   >
                     <span>Book This Program</span>
                     <ChevronRight className="w-4 h-4" />
@@ -327,14 +327,14 @@ export default function Home() {
       </section>
 
       {/* 4. GALLERY */}
-      <section id="gallery" className="py-20 bg-slate-100/30 dark:bg-slate-900/30 border-b border-slate-200 dark:border-slate-800/60">
+      <section id="gallery" className="py-20 bg-slate-100/30 dark:bg-slate-900/30 border-b border-theme/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
             <div>
               <span className="text-xs font-extrabold uppercase tracking-widest text-lime-400">
                 Court Showcase &amp; Facilities
               </span>
-              <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white mt-1">
+              <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-theme mt-1">
                 Explore the Academy
               </h2>
             </div>
@@ -347,7 +347,7 @@ export default function Home() {
                   className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                     galleryFilter === cat
                       ? 'bg-lime-400 text-slate-950 shadow-md shadow-lime-400/20'
-                      : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-800'
+                      : 'bg-surface text-theme hover:bg-slate-100 dark:hover:bg-slate-800 border border-theme'
                   }`}
                 >
                   {cat}
@@ -358,7 +358,7 @@ export default function Home() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredGallery.map((item) => (
-              <div key={item.id} className="relative rounded-2xl overflow-hidden h-72 border border-slate-200 dark:border-slate-800 group bg-white dark:bg-slate-900">
+              <div key={item.id} className="relative rounded-2xl overflow-hidden h-72 border border-theme group bg-surface">
                 <img
                   src={item.image}
                   alt={item.title}
@@ -380,28 +380,28 @@ export default function Home() {
       </section>
 
       {/* 5. TESTIMONIALS */}
-      <section className="py-20 relative border-b border-slate-200 dark:border-slate-800/60">
+      <section className="py-20 relative border-b border-theme/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto space-y-3 mb-14">
             <span className="text-xs font-extrabold uppercase tracking-widest text-lime-400">
               Community Testimonials
             </span>
-            <h2 className="font-heading text-3xl font-extrabold text-slate-900 dark:text-white">Loved by Players of All Levels</h2>
+            <h2 className="font-heading text-3xl font-extrabold text-theme">Loved by Players of All Levels</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {TESTIMONIALS.map((t) => (
-              <div key={t.id} className="glass-card rounded-2xl p-6 space-y-4 relative bg-white/60 dark:bg-slate-900/60">
+              <div key={t.id} className="glass-card rounded-2xl p-6 space-y-4 relative bg-surface/60 dark:bg-slate-900/60">
                 <div className="flex items-center gap-1 text-amber-400">
                   {[...Array(t.rating)].map((_, i) => (
                     <Star key={i} className="w-4 h-4 fill-amber-400" />
                   ))}
                 </div>
-                <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed italic">&quot;{t.text}&quot;</p>
-                <div className="flex items-center gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
-                  <img src={t.avatar} alt={t.name} className="w-10 h-10 rounded-full object-cover border border-slate-300 dark:border-slate-700 bg-slate-200 dark:bg-slate-800" />
+                <p className="text-sm text-theme leading-relaxed italic">&quot;{t.text}&quot;</p>
+                <div className="flex items-center gap-3 pt-3 border-t border-theme">
+                  <img src={t.avatar} alt={t.name} className="w-10 h-10 rounded-full object-cover border border-theme bg-surface border-theme" />
                   <div>
-                    <h5 className="font-bold text-slate-900 dark:text-white text-sm">{t.name}</h5>
+                    <h5 className="font-bold text-theme text-sm">{t.name}</h5>
                     <span className="text-xs text-lime-400">{t.level}</span>
                   </div>
                 </div>
@@ -412,27 +412,27 @@ export default function Home() {
       </section>
 
       {/* 6. PLAYER REVIEWS */}
-      <section className="py-20 bg-slate-100/40 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-800/60">
+      <section className="py-20 bg-slate-100/40 dark:bg-slate-900/40 border-b border-theme/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto space-y-3 mb-14">
             <span className="text-xs font-extrabold uppercase tracking-widest text-lime-400">Player Reviews</span>
-            <h2 className="font-heading text-3xl font-extrabold text-slate-900 dark:text-white">What Our Players Say</h2>
+            <h2 className="font-heading text-3xl font-extrabold text-theme">What Our Players Say</h2>
           </div>
 
           {user && (
-            <div className="max-w-xl mx-auto mb-10 glass-panel rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4">
+            <div className="max-w-xl mx-auto mb-10 glass-panel rounded-2xl border border-theme p-5 space-y-4">
               <div className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-lime-400" />
-                <span className="text-sm font-bold text-slate-900 dark:text-white">Leave a Comment</span>
+                <span className="text-sm font-bold text-theme">Leave a Comment</span>
               </div>
               <div className="flex items-center gap-1">
                 {[1,2,3,4,5].map(n => (
                   <button key={n} onClick={() => setCommentRating(n)} type="button">
-                    <Star className={`w-5 h-5 ${n <= commentRating ? 'fill-amber-400 text-amber-400' : 'text-slate-400 dark:text-slate-600'}`} />
+                    <Star className={`w-5 h-5 ${n <= commentRating ? 'fill-amber-400 text-amber-400' : 'text-muted'}`} />
                   </button>
                 ))}
               </div>
-              <textarea value={commentText} onChange={e => setCommentText(e.target.value)} rows={3} placeholder="Share your experience at MM Padel Academy..." className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:border-lime-400 resize-none" />
+              <textarea value={commentText} onChange={e => setCommentText(e.target.value)} rows={3} placeholder="Share your experience at MM Padel Academy..." className="w-full px-4 py-3 rounded-xl bg-surface border border-theme text-theme text-sm focus:outline-none focus:border-lime-400 resize-none" />
               {commentMsg && <p className={`text-xs ${commentMsg.includes('Thank') ? 'text-emerald-400' : 'text-rose-400'}`}>{commentMsg}</p>}
               <button onClick={async () => {
                 if (!commentText.trim()) return
@@ -454,39 +454,39 @@ export default function Home() {
           )}
 
           {!user && (
-            <p className="text-center text-slate-400 dark:text-slate-500 text-sm mb-8">Sign in to leave a review.</p>
+            <p className="text-center text-muted text-sm mb-8">Sign in to leave a review.</p>
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {comments.length > 0 ? comments.slice(0, 6).map((c) => (
-              <div key={c.id} className="glass-card rounded-2xl p-6 space-y-3 bg-white/60 dark:bg-slate-900/60">
+              <div key={c.id} className="glass-card rounded-2xl p-6 space-y-3 bg-surface/60 dark:bg-slate-900/60">
                 <div className="flex items-center gap-1 text-amber-400">
                   {[...Array(c.rating || 5)].map((_, i) => (
                     <Star key={i} className="w-4 h-4 fill-amber-400" />
                   ))}
                 </div>
-                <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed italic">&quot;{c.text}&quot;</p>
-                <div className="flex items-center gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <p className="text-sm text-theme leading-relaxed italic">&quot;{c.text}&quot;</p>
+                <div className="flex items-center gap-3 pt-3 border-t border-theme">
                   <div className="w-9 h-9 rounded-full bg-lime-400/20 text-lime-400 flex items-center justify-center font-bold text-xs border border-lime-400/40">
                     {(c.user_name || 'U').charAt(0)}
                   </div>
                   <div>
-                    <h5 className="font-bold text-slate-900 dark:text-white text-sm">{c.user_name}</h5>
+                    <h5 className="font-bold text-theme text-sm">{c.user_name}</h5>
                   </div>
                 </div>
               </div>
             )) : TESTIMONIALS.map((t) => (
-              <div key={t.id} className="glass-card rounded-2xl p-6 space-y-4 relative bg-white/60 dark:bg-slate-900/60">
+              <div key={t.id} className="glass-card rounded-2xl p-6 space-y-4 relative bg-surface/60 dark:bg-slate-900/60">
                 <div className="flex items-center gap-1 text-amber-400">
                   {[...Array(t.rating)].map((_, i) => (
                     <Star key={i} className="w-4 h-4 fill-amber-400" />
                   ))}
                 </div>
-                <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed italic">&quot;{t.text}&quot;</p>
-                <div className="flex items-center gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
-                  <img src={t.avatar} alt={t.name} className="w-10 h-10 rounded-full object-cover border border-slate-300 dark:border-slate-700 bg-slate-200 dark:bg-slate-800" />
+                <p className="text-sm text-theme leading-relaxed italic">&quot;{t.text}&quot;</p>
+                <div className="flex items-center gap-3 pt-3 border-t border-theme">
+                  <img src={t.avatar} alt={t.name} className="w-10 h-10 rounded-full object-cover border border-theme bg-surface border-theme" />
                   <div>
-                    <h5 className="font-bold text-slate-900 dark:text-white text-sm">{t.name}</h5>
+                    <h5 className="font-bold text-theme text-sm">{t.name}</h5>
                     <span className="text-xs text-lime-400">{t.level}</span>
                   </div>
                 </div>
@@ -497,11 +497,11 @@ export default function Home() {
       </section>
 
       {/* 7. CONTACT */}
-      <section className="py-20 bg-slate-100/40 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-800/60">
+      <section className="py-20 bg-slate-100/40 dark:bg-slate-900/40 border-b border-theme/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto space-y-3 mb-12">
             <span className="text-xs font-extrabold uppercase tracking-widest text-lime-400">Find Us</span>
-            <h2 className="font-heading text-3xl font-extrabold text-slate-900 dark:text-white">Contact the Academy</h2>
+            <h2 className="font-heading text-3xl font-extrabold text-theme">Contact the Academy</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <a href={CONTACT.phoneHref} className="glass-card rounded-2xl p-6 flex items-start gap-4 hover:border-lime-400/40">
@@ -509,8 +509,8 @@ export default function Home() {
                 <Phone className="w-5 h-5" />
               </span>
               <span>
-                <span className="block text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold">Phone / WhatsApp</span>
-                <span className="block text-slate-900 dark:text-white font-extrabold mt-1">{CONTACT.phone}</span>
+                <span className="block text-xs uppercase tracking-wider text-muted font-bold">Phone / WhatsApp</span>
+                <span className="block text-theme font-extrabold mt-1">{CONTACT.phone}</span>
               </span>
             </a>
             <div className="glass-card rounded-2xl p-6 flex items-start gap-4">
@@ -518,8 +518,8 @@ export default function Home() {
                 <Clock className="w-5 h-5" />
               </span>
               <span>
-                <span className="block text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold">Hours</span>
-                <span className="block text-slate-900 dark:text-white font-extrabold mt-1">{CONTACT.hours}</span>
+                <span className="block text-xs uppercase tracking-wider text-muted font-bold">Hours</span>
+                <span className="block text-theme font-extrabold mt-1">{CONTACT.hours}</span>
               </span>
             </div>
             <a href={mapsUrl} target="_blank" rel="noreferrer" className="glass-card rounded-2xl p-6 flex items-start gap-4 hover:border-lime-400/40">
@@ -527,8 +527,8 @@ export default function Home() {
                 <MapPin className="w-5 h-5" />
               </span>
               <span>
-                <span className="block text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold">Location</span>
-                <span className="block text-slate-600 dark:text-slate-200 text-sm mt-1 leading-relaxed">{CONTACT.address}</span>
+                <span className="block text-xs uppercase tracking-wider text-muted font-bold">Location</span>
+                <span className="block text-theme text-sm mt-1 leading-relaxed">{CONTACT.address}</span>
                 <span className="block text-lime-400 text-xs font-bold mt-2">Open in Google Maps &rarr;</span>
               </span>
             </a>
@@ -537,10 +537,10 @@ export default function Home() {
       </section>
 
       {/* CTA */}
-      <section className="py-16 bg-gradient-to-r from-lime-500/20 via-emerald-500/10 to-slate-100 dark:to-slate-900 border-t border-slate-200 dark:border-slate-800">
+      <section className="py-16 bg-gradient-to-r from-lime-500/20 via-emerald-500/10 to-slate-100 dark:to-slate-900 border-t border-theme">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
-          <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">Ready to Step Onto the Court?</h2>
-          <p className="text-slate-600 dark:text-slate-300 max-w-xl mx-auto text-base">
+          <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-theme">Ready to Step Onto the Court?</h2>
+          <p className="text-theme max-w-xl mx-auto text-base">
             Book your package online in seconds or register for academy training today.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
@@ -554,14 +554,14 @@ export default function Home() {
             {!user ? (
               <Link
                 to="/signup"
-                className="px-8 py-3.5 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-900 dark:text-white font-bold text-sm border border-slate-300 dark:border-slate-700 transition-all"
+                className="px-8 py-3.5 rounded-xl bg-surface hover:bg-slate-100 dark:hover:bg-slate-800 text-theme font-bold text-sm border border-theme transition-all"
               >
                 <span>Create Free Account</span>
               </Link>
             ) : (
               <Link
                 to="/profile"
-                className="px-8 py-3.5 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-900 dark:text-white font-bold text-sm border border-slate-300 dark:border-slate-700 transition-all"
+                className="px-8 py-3.5 rounded-xl bg-surface hover:bg-slate-100 dark:hover:bg-slate-800 text-theme font-bold text-sm border border-theme transition-all"
               >
                 <span>View My Profile</span>
               </Link>

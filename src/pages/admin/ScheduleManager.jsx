@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Calendar as CalendarIcon, Check, Clock, Download, FileSpreadsheet, Plus, Trash2, Upload, X } from 'lucide-react'
 import { api, downloadFile } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
@@ -16,7 +16,7 @@ function formatDateShort(d) { const [,m,day] = d.split('-'); return `${Number(da
 function getDayName(d) { return DAY_NAMES[new Date(d + 'T00:00:00').getDay()] }
 
 export default function ScheduleManager() {
-  const { isAdmin } = useAuth()
+  const { isAdmin, isSuperAdmin } = useAuth()
   const canEdit = isAdmin
   const [activeTab, setActiveTab] = useState('schedule')
   const [view, setView] = useState('day')
@@ -25,21 +25,24 @@ export default function ScheduleManager() {
   const [loading, setLoading] = useState(true)
   const [editSlot, setEditSlot] = useState(null)
   const [addSlot, setAddSlot] = useState(null)
-  const [addForm, setAddForm] = useState({ date: '', time: '15:00', court: 1, player_text: '' })
+  const [addForm, setAddForm] = useState({ date: '', time: '15:00', court: 1, player_text: '', session_type: null })
+  const [addPartner, setAddPartner] = useState('')
+  const [selectedPlayer, setSelectedPlayer] = useState(null)
   const [conversionRequests, setConversionRequests] = useState([])
   const [convLoading, setConvLoading] = useState(false)
   const [importPreview, setImportPreview] = useState(null)
   const [importFile, setImportFile] = useState(null)
   const [importing, setImporting] = useState(false)
   const [uploadMessage, setUploadMessage] = useState(null)
+  const [balanceWarning, setBalanceWarning] = useState(null)
 
   const fetchSlots = () => {
     setLoading(true)
     const today = new Date()
     const start = new Date(today)
-    start.setDate(today.getDate() - today.getDay())
-    const end = new Date(start)
-    end.setDate(start.getDate() + 14)
+    start.setDate(today.getDate() - 30)
+    const end = new Date(today)
+    end.setDate(today.getDate() + 30)
     api.get(`/slots?from=${start.toISOString().slice(0, 10)}&to=${end.toISOString().slice(0, 10)}`)
       .then(setSlots)
       .catch(() => {})
@@ -52,6 +55,22 @@ export default function ScheduleManager() {
   }
 
   useEffect(() => { fetchSlots(); fetchConversionRequests() }, [])
+
+  const checkPlayerBalance = (player) => {
+    if (!player || isSuperAdmin) return null
+    const priv = player.private_balance || 0
+    const grp = player.group_balance || 0
+    const total = priv + grp
+    if (total > 0) return null
+    if (!player.balance_zero_since) return null
+    const zeroDate = new Date(player.balance_zero_since)
+    const now = new Date()
+    const diffDays = Math.floor((now - zeroDate) / (1000 * 60 * 60 * 24))
+    if (diffDays > 14) {
+      return { type: 'blocked', player: player.full_name, days: diffDays }
+    }
+    return { type: 'warning', player: player.full_name, days: diffDays, proceed: true }
+  }
 
   const slotsByDate = useMemo(() => {
     const map = new Map()
@@ -76,7 +95,8 @@ export default function ScheduleManager() {
     return times.map(time => {
       const c1 = daySlots.find(s => s.time === time && s.court === 1)
       const c2 = daySlots.find(s => s.time === time && s.court === 2)
-      return { time, label: TIME_LABELS[time] || time, slot1: c1 || null, slot2: c2 || null }
+      const c3 = daySlots.find(s => s.time === time && s.court === 3)
+      return { time, label: TIME_LABELS[time] || time, slot1: c1 || null, slot2: c2 || null, slot3: c3 || null }
     })
   }, [date, slotsByDate])
 
@@ -85,10 +105,29 @@ export default function ScheduleManager() {
   }
 
   const handleAddSlot = async () => {
+    if (selectedPlayer && !isSuperAdmin) {
+      const priv = selectedPlayer.private_balance || 0
+      const grp = selectedPlayer.group_balance || 0
+      if (priv + grp <= 0 && selectedPlayer.balance_zero_since) {
+        const zeroDate = new Date(selectedPlayer.balance_zero_since)
+        const now = new Date()
+        const diffDays = Math.floor((now - zeroDate) / (1000 * 60 * 60 * 24))
+        if (diffDays > 14) {
+          setBalanceWarning({ type: 'blocked', player: selectedPlayer.full_name, days: diffDays })
+          return
+        }
+      }
+    }
     try {
-      await api.post('/slots', addForm)
+      const payload = { ...addForm }
+      if (addForm.session_type === 'group' && addPartner.trim()) {
+        payload.player_text = `${addForm.player_text} / ${addPartner.trim()}`
+      }
+      await api.post('/slots', payload)
       setAddSlot(null)
-      setAddForm({ date: '', time: '15:00', court: 1, player_text: '' })
+      setAddForm({ date: '', time: '15:00', court: 1, player_text: '', session_type: null })
+      setAddPartner('')
+      setSelectedPlayer(null)
       fetchSlots()
     } catch {}
   }
@@ -136,17 +175,17 @@ export default function ScheduleManager() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-3xl font-black text-slate-900 dark:text-white">Schedule Manager</h1>
-        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Manage slots, upload schedules, and conversion requests</p>
+        <h1 className="font-heading text-3xl font-black text-theme">Schedule Manager</h1>
+        <p className="text-muted text-sm mt-1">Manage slots, upload schedules, and conversion requests</p>
       </div>
 
-      <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 w-fit">
+      <div className="flex items-center gap-2 bg-surface p-1.5 rounded-2xl border border-theme w-fit">
         {[
           { id: 'schedule', label: 'Schedule', icon: CalendarIcon },
           { id: 'upload', label: 'Upload', icon: Upload },
           { id: 'conversions', label: `Conversions${pendingConversions.length > 0 ? ` (${pendingConversions.length})` : ''}`, icon: FileSpreadsheet },
         ].map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center gap-2 ${activeTab === tab.id ? 'bg-lime-400 text-slate-950 shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center gap-2 ${activeTab === tab.id ? 'bg-lime-400 text-slate-950 shadow-md' : 'text-muted hover:text-theme'}`}>
             <tab.icon className="w-4 h-4" /><span>{tab.label}</span>
           </button>
         ))}
@@ -155,16 +194,16 @@ export default function ScheduleManager() {
       {activeTab === 'schedule' && (
         <>
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-            <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800">
-              <button onClick={() => setView('day')} className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center gap-2 ${view === 'day' ? 'bg-lime-400 text-slate-950 shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>
+            <div className="flex items-center gap-2 bg-surface p-1.5 rounded-2xl border border-theme">
+              <button onClick={() => setView('day')} className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center gap-2 ${view === 'day' ? 'bg-lime-400 text-slate-950 shadow-md' : 'text-muted hover:text-theme'}`}>
                 <CalendarIcon className="w-4 h-4" /><span>Day View</span>
               </button>
-              <button onClick={() => setView('week')} className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center gap-2 ${view === 'week' ? 'bg-lime-400 text-slate-950 shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>
+              <button onClick={() => setView('week')} className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all flex items-center gap-2 ${view === 'week' ? 'bg-lime-400 text-slate-950 shadow-md' : 'text-muted hover:text-theme'}`}>
                 <CalendarIcon className="w-4 h-4" /><span>Week View</span>
               </button>
             </div>
             <div className="flex gap-2 items-center">
-              <input type="date" value={date} onChange={e => setDate(e.target.value)} className="px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-bold focus:outline-none focus:border-lime-400" />
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className="px-4 py-2 rounded-xl bg-surface border border-theme text-theme text-xs font-bold focus:outline-none focus:border-lime-400" />
               {canEdit && (
                 <button onClick={() => { setAddSlot(true); setAddForm({ ...addForm, date }) }} className="px-4 py-2 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 text-xs font-bold flex items-center gap-1">
                   <Plus className="w-4 h-4" /> Add Slot
@@ -176,34 +215,44 @@ export default function ScheduleManager() {
           {loading ? (
             <div className="flex justify-center py-16"><div className="w-8 h-8 border-2 border-lime-400 border-t-transparent rounded-full animate-spin" /></div>
           ) : view === 'day' ? (
-            <div className="glass-panel rounded-3xl p-6 border border-slate-200 dark:border-slate-800">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
-                <h3 className="font-heading font-extrabold text-slate-900 dark:text-white text-lg">{getDayName(date)} {formatDateShort(date)}</h3>
-                <span className="text-xs text-lime-400 font-bold bg-lime-400/10 px-3 py-1 rounded-full border border-lime-400/30">2 Courts</span>
+            <div className="glass-panel rounded-3xl p-6 border border-theme">
+              <div className="flex items-center justify-between pb-3 border-b border-theme mb-4">
+                <h3 className="font-heading font-extrabold text-theme text-lg">{getDayName(date)} {formatDateShort(date)}</h3>
+                <span className="text-xs text-lime-400 font-bold bg-lime-400/10 px-3 py-1 rounded-full border border-lime-400/30">3 Courts</span>
               </div>
               {currentDaySlots.length === 0 ? (
-                <p className="text-sm text-slate-500 dark:text-slate-400 py-8 text-center">No slots for this date.</p>
+                <p className="text-sm text-muted py-8 text-center">No slots for this date.</p>
               ) : (
-                <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+                <div className="overflow-x-auto rounded-2xl border border-theme">
                   <div className="min-w-[320px]">
-                    <div className="grid grid-cols-4 bg-slate-100/80 dark:bg-slate-900/80 text-center">
-                      <div className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-left">Time</div>
-                      <div className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-lime-400 border-l border-slate-200 dark:border-slate-800">Court 1</div>
-                      <div className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-lime-400 border-l border-slate-200 dark:border-slate-800">Court 2</div>
-                      <div className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-l border-slate-200 dark:border-slate-800">Actions</div>
+                    <div className="grid grid-cols-5 bg-slate-100/80 dark:bg-slate-900/80 text-center">
+                      <div className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-muted text-left">Time</div>
+                      <div className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-lime-400 border-l border-theme">Court 1</div>
+                      <div className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-lime-400 border-l border-theme">Court 2</div>
+                      <div className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-lime-400 border-l border-theme">Court 3</div>
+                      <div className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-muted border-l border-theme">Actions</div>
                     </div>
-                    <div className="divide-y divide-slate-200/60 dark:divide-slate-800/60">
+                    <div className="divide-y divide-theme">
                       {currentDaySlots.map((row) => (
-                        <div key={row.time} className="grid grid-cols-4 items-stretch text-sm">
-                          <div className="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono text-xs flex items-center gap-1.5 bg-slate-50/40 dark:bg-slate-900/40">
+                        <div key={row.time} className="grid grid-cols-5 items-stretch text-sm">
+                          <div className="px-4 py-3 text-theme font-mono text-xs flex items-center gap-1.5 bg-surface/80">
                             <Clock className="w-3.5 h-3.5 text-lime-400 shrink-0" />
                             {row.label}
                           </div>
-                           {[row.slot1, row.slot2].map((slot, i) => (
-                            <div key={i} className={`px-4 py-3 border-l border-slate-200/60 dark:border-slate-800/60 text-xs font-bold text-center flex items-center justify-center gap-2 ${slot ? 'bg-rose-500/10 text-rose-300' : 'bg-lime-400/5 text-lime-400'}`}>
+                           {[row.slot1, row.slot2, row.slot3].map((slot, i) => {
+                            const statusColor = slot
+                              ? slot.status === 'pending' ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-300'
+                              : 'bg-lime-400/5 text-lime-400'
+                            return (
+                            <div key={i} className={`px-4 py-3 border-l border-slate-200/60 dark:border-slate-800/60 text-xs font-bold text-center flex items-center justify-center gap-2 ${statusColor}`}>
                               {slot ? (
                                 <>
                                   <span className="truncate">{slot.player_text}</span>
+                                  {slot.session_type && (
+                                    <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded shrink-0 ${slot.session_type === 'group' ? 'bg-purple-400/20 text-purple-400' : 'bg-blue-400/20 text-blue-400'}`}>
+                                      {slot.session_type === 'group' ? 'GRP' : 'PVT'}
+                                    </span>
+                                  )}
                                   {canEdit && (
                                     <div className="flex gap-1 shrink-0">
                                       <button onClick={() => setEditSlot(slot)} className="p-0.5 text-slate-400 hover:text-blue-400" title="Edit"><CalendarIcon className="w-3 h-3" /></button>
@@ -213,10 +262,10 @@ export default function ScheduleManager() {
                                 </>
                               ) : 'Available'}
                             </div>
-                          ))}
+                          )})}
                           <div className="px-2 py-3 border-l border-slate-200/60 dark:border-slate-800/60 flex items-center justify-center gap-1">
-                            {[1, 2].map(court => {
-                              const exists = court === 1 ? row.slot1 : row.slot2
+                            {[1, 2, 3].map(court => {
+                              const exists = court === 1 ? row.slot1 : court === 2 ? row.slot2 : row.slot3
                               if (exists) return null
                               if (!canEdit) return null
                               return (
@@ -234,32 +283,37 @@ export default function ScheduleManager() {
               )}
             </div>
           ) : (
-            <div className="glass-panel rounded-3xl p-6 border border-slate-200 dark:border-slate-800 overflow-x-auto">
+            <div className="glass-panel rounded-3xl p-6 border border-theme overflow-x-auto">
               <div className="min-w-[850px]">
-                <div className="grid grid-cols-6 gap-3 pb-4 border-b border-slate-200 dark:border-slate-800 text-center font-heading text-sm font-extrabold text-slate-900 dark:text-white">
-                  <div className="text-left text-slate-500 dark:text-slate-400 text-xs uppercase">Time</div>
+                <div className="grid grid-cols-6 gap-3 pb-4 border-b border-theme text-center font-heading text-sm font-extrabold text-theme">
+                  <div className="text-left text-muted text-xs uppercase">Time</div>
                   {weekDates.map(d => (
                     <div key={d} className="text-lime-400 text-xs">{getDayName(d)} ({formatDateShort(d)})</div>
                   ))}
                 </div>
-                <div className="divide-y divide-slate-200/60 dark:divide-slate-800/60 pt-2 space-y-2">
+                <div className="divide-y divide-theme pt-2 space-y-2">
                   {weekTimes.map(time => (
                     <div key={time} className="grid grid-cols-6 gap-3 py-2 items-center text-xs">
-                      <div className="font-bold text-slate-900 dark:text-white font-mono flex items-center gap-1.5 text-[11px]">
+                        <div className="font-bold text-theme font-mono flex items-center gap-1.5 text-[11px]">
                         <Clock className="w-3.5 h-3.5 text-lime-400" />
                         <span>{TIME_LABELS[time] || time}</span>
                       </div>
-                      {weekDates.map(d => {
+                       {weekDates.map(d => {
                         const daySlots = slotsByDate.get(d) || []
                         const s1 = daySlots.find(x => x.time === time && x.court === 1)
                         const s2 = daySlots.find(x => x.time === time && x.court === 2)
-                        const empty = !s1 && !s2
+                        const s3 = daySlots.find(x => x.time === time && x.court === 3)
+                        const empty = !s1 && !s2 && !s3
+                        const hasSlots = s1 || s2 || s3
+                        const weekStatusColor = hasSlots
+                          ? (s1?.status === 'pending' || s2?.status === 'pending' || s3?.status === 'pending') ? 'bg-amber-500/15 border-amber-500/40 text-amber-400' : 'bg-rose-500/15 border-rose-500/40 text-rose-300'
+                          : 'bg-surface/80 text-muted border-theme'
                         return (
-                           <div key={d} className={`p-2.5 rounded-xl border text-[11px] font-bold text-center leading-snug ${empty ? 'bg-slate-50/40 dark:bg-slate-900/40 text-slate-400 dark:text-slate-600 border-slate-200/40 dark:border-slate-800/40' : 'bg-rose-500/15 border-rose-500/40 text-rose-300'}`}>
+                           <div key={d} className={`p-2.5 rounded-xl border text-[11px] font-bold text-center leading-snug ${weekStatusColor}`}>
                             {empty ? (
                               canEdit ? <button onClick={() => { setAddSlot(true); setAddForm({ ...addForm, date: d, time }) }} className="text-lime-400 hover:underline">+ Add</button> : 'Available'
                             ) : (
-                              <span className="block">{s1 && s2 ? `C1: ${s1.player_text} / C2: ${s2.player_text}` : s1 ? `C1: ${s1.player_text}` : `C2: ${s2.player_text}`}</span>
+                              <span className="block">{[s1 && `C1: ${s1.player_text}`, s2 && `C2: ${s2.player_text}`, s3 && `C3: ${s3.player_text}`].filter(Boolean).join(' / ')}</span>
                             )}
                           </div>
                         )
@@ -274,8 +328,8 @@ export default function ScheduleManager() {
       )}
 
       {activeTab === 'upload' && (
-        <div className="glass-panel rounded-3xl p-6 border border-slate-200 dark:border-slate-800">
-          <h3 className="font-heading font-extrabold text-slate-900 dark:text-white text-lg mb-4">Upload Schedule</h3>
+        <div className="glass-panel rounded-3xl p-6 border border-theme">
+          <h3 className="font-heading font-extrabold text-theme text-lg mb-4">Upload Schedule</h3>
           <div className="space-y-4">
             {uploadMessage && (
               <div className={`p-3 rounded-xl text-sm font-semibold ${
@@ -296,11 +350,11 @@ export default function ScheduleManager() {
                 a.click()
                 URL.revokeObjectURL(url)
               } catch {}
-            }} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
+            }} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface border border-theme text-theme text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
               <Download className="w-4 h-4" /> Download Template
             </button>
             <div className="flex items-center gap-3">
-              <input type="file" accept=".xlsx,.xls,.csv" onChange={e => setImportFile(e.target.files?.[0])} className="text-xs text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-lime-400 file:text-slate-950 file:cursor-pointer" />
+              <input type="file" accept=".xlsx,.xls,.csv" onChange={e => setImportFile(e.target.files?.[0])} className="text-xs text-muted file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-lime-400 file:text-slate-950 file:cursor-pointer" />
               <button onClick={handleUploadFile} disabled={!importFile || importing} className="px-4 py-2 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 text-xs font-bold disabled:opacity-50">
                 {importing ? 'Uploading...' : 'Preview'}
               </button>
@@ -308,7 +362,7 @@ export default function ScheduleManager() {
             {importPreview && (
               <div className="mt-4 space-y-3">
                 <div className="flex items-center gap-4 text-xs">
-                  <span className="text-slate-500 dark:text-slate-400">Total: <strong className="text-slate-900 dark:text-white">{importPreview.totalRows}</strong></span>
+                  <span className="text-muted">Total: <strong className="text-theme">{importPreview.totalRows}</strong></span>
                   <span className="text-emerald-400">Valid: <strong>{importPreview.validRows}</strong></span>
                   {importPreview.errors.length > 0 && <span className="text-rose-400">Errors: <strong>{importPreview.errors.length}</strong></span>}
                 </div>
@@ -329,29 +383,29 @@ export default function ScheduleManager() {
       )}
 
       {activeTab === 'conversions' && (
-        <div className="glass-panel rounded-3xl p-6 border border-slate-200 dark:border-slate-800">
-          <h3 className="font-heading font-extrabold text-slate-900 dark:text-white text-lg mb-4">Conversion Requests</h3>
+        <div className="glass-panel rounded-3xl p-6 border border-theme">
+          <h3 className="font-heading font-extrabold text-theme text-lg mb-4">Conversion Requests</h3>
           {convLoading ? (
             <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-lime-400 border-t-transparent rounded-full animate-spin" /></div>
           ) : conversionRequests.length === 0 ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-8">No conversion requests.</p>
+            <p className="text-sm text-muted text-center py-8">No conversion requests.</p>
           ) : (
             <div className="space-y-3">
               {conversionRequests.map(r => (
-                <div key={r.id} className="p-4 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div key={r.id} className="p-4 rounded-2xl bg-surface/80 dark:bg-slate-900/80 border border-theme flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-1">
-                      <span className="text-sm font-bold text-slate-900 dark:text-white">{r.user_name}</span>
+                      <span className="text-sm font-bold text-theme">{r.user_name}</span>
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                         r.status === 'pending' ? 'bg-amber-400/20 text-amber-400' :
                         r.status === 'approved' ? 'bg-emerald-400/20 text-emerald-400' :
                         'bg-rose-400/20 text-rose-400'
                       }`}>{r.status}</span>
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="text-xs text-muted">
                       Convert {r.count} {r.from} → {r.to} ({r.from === 'private' ? r.count * 2 : r.count} {r.to} sessions)
                     </p>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{r.created_at?.slice(0, 16)}</p>
+                    <p className="text-[10px] text-muted mt-0.5">{r.created_at?.slice(0, 16)}</p>
                   </div>
                   {r.status === 'pending' && (
                     <div className="flex gap-2 shrink-0">
@@ -372,36 +426,55 @@ export default function ScheduleManager() {
 
       {addSlot && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md">
-          <div className="w-full max-w-sm glass-panel rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6">
+          <div className="w-full max-w-sm glass-panel rounded-2xl border border-theme shadow-2xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Add Slot</h3>
-              <button onClick={() => setAddSlot(null)} className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg"><X className="w-5 h-5" /></button>
+              <h3 className="text-lg font-bold text-theme">Add Slot</h3>
+              <button onClick={() => setAddSlot(null)} className="p-2 text-muted hover:text-theme hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg"><X className="w-5 h-5" /></button>
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Date</label>
-                <input type="date" value={addForm.date} onChange={e => setAddForm({ ...addForm, date: e.target.value })} className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs" />
+                <label className="block text-xs font-semibold text-theme uppercase mb-1">Date</label>
+                <input type="date" value={addForm.date} onChange={e => setAddForm({ ...addForm, date: e.target.value })} className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Time</label>
-                <select value={addForm.time} onChange={e => setAddForm({ ...addForm, time: e.target.value })} className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs">
+                <label className="block text-xs font-semibold text-theme uppercase mb-1">Time</label>
+                <select value={addForm.time} onChange={e => setAddForm({ ...addForm, time: e.target.value })} className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs">
                   {ALL_TIMES.map(t => <option key={t} value={t}>{TIME_LABELS[t]}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Court</label>
-                <select value={addForm.court} onChange={e => setAddForm({ ...addForm, court: parseInt(e.target.value) })} className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs">
+                <label className="block text-xs font-semibold text-theme uppercase mb-1">Court</label>
+                <select value={addForm.court} onChange={e => setAddForm({ ...addForm, court: parseInt(e.target.value) })} className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs">
                   <option value={1}>Court 1</option>
                   <option value={2}>Court 2</option>
+                  <option value={3}>Court 3</option>
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Player Name</label>
-                <input type="text" value={addForm.player_text} onChange={e => setAddForm({ ...addForm, player_text: e.target.value })} placeholder="e.g. Zain" className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs" />
+                <label className="block text-xs font-semibold text-theme uppercase mb-1">Player Name</label>
+                <PlayerAutocomplete value={addForm.player_text} onChange={val => setAddForm({ ...addForm, player_text: val })} onPlayerSelect={(p) => {
+                setSelectedPlayer(p)
+                const warn = checkPlayerBalance(p)
+                if (warn) setBalanceWarning(warn)
+              }} placeholder="e.g. Zain" />
               </div>
+              <div>
+                <label className="block text-xs font-semibold text-theme uppercase mb-1">Session Type</label>
+                <select value={addForm.session_type || ''} onChange={e => setAddForm({ ...addForm, session_type: e.target.value || null })} className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs">
+                  <option value="">None (Admin slot)</option>
+                  <option value="private">Private</option>
+                  <option value="group">Group</option>
+                </select>
+              </div>
+              {addForm.session_type === 'group' && (
+                <div>
+                  <label className="block text-xs font-semibold text-theme uppercase mb-1">Partner</label>
+                  <PlayerAutocomplete value={addPartner} onChange={setAddPartner} placeholder="e.g. Zain" />
+                </div>
+              )}
             </div>
             <div className="flex gap-3 mt-4">
-              <button onClick={() => setAddSlot(null)} className="flex-1 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-semibold">Cancel</button>
+              <button onClick={() => setAddSlot(null)} className="flex-1 py-2.5 rounded-xl bg-surface border border-theme text-theme text-sm font-semibold">Cancel</button>
               <button onClick={handleAddSlot} className="flex-1 py-2.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-bold text-sm">Add</button>
             </div>
           </div>
@@ -411,18 +484,55 @@ export default function ScheduleManager() {
       {editSlot && (
         <EditSlotModal slot={editSlot} onClose={() => setEditSlot(null)} onSaved={() => { setEditSlot(null); fetchSlots() }} />
       )}
+
+      {balanceWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md">
+          <div className="w-full max-w-sm glass-panel rounded-2xl border border-theme shadow-2xl p-6 text-center">
+            <div className={`w-12 h-12 rounded-full mx-auto mb-4 flex items-center justify-center ${balanceWarning.type === 'blocked' ? 'bg-rose-500/20' : 'bg-amber-500/20'}`}>
+              {balanceWarning.type === 'blocked' ? (
+                <span className="text-rose-400 text-2xl font-bold">!</span>
+              ) : (
+                <span className="text-amber-400 text-2xl font-bold">!</span>
+              )}
+            </div>
+            <h3 className="text-lg font-bold text-theme mb-2">
+              {balanceWarning.type === 'blocked' ? 'Player Blocked' : 'Low Balance Warning'}
+            </h3>
+            <p className="text-muted text-sm mb-4">
+              {balanceWarning.type === 'blocked'
+                ? `${balanceWarning.player} has been at 0 balance for ${balanceWarning.days} days. Admin cannot add this player to any slot.`
+                : `${balanceWarning.player} has 0 balance (${balanceWarning.days} days since balance hit 0). You can still proceed for 2 weeks.`
+              }
+            </p>
+            <div className="flex gap-3">
+              {balanceWarning.type === 'warning' && (
+                <button onClick={() => setBalanceWarning(null)} className="flex-1 py-2.5 rounded-xl bg-surface border border-theme text-theme text-sm font-semibold">Cancel</button>
+              )}
+              <button onClick={() => setBalanceWarning(null)} className={`flex-1 py-2.5 rounded-xl text-sm font-bold ${balanceWarning.type === 'blocked' ? 'bg-rose-500 hover:bg-rose-400 text-white' : 'bg-amber-500 hover:bg-amber-400 text-white'}`}>
+                {balanceWarning.type === 'blocked' ? 'OK' : 'Proceed Anyway'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 function EditSlotModal({ slot, onClose, onSaved }) {
-  const [form, setForm] = useState({ player_text: slot.player_text || '', date: slot.date, time: slot.time, court: slot.court })
+  const existingParts = (slot.player_text || '').split(/\s*\/\s*/)
+  const [form, setForm] = useState({ player_text: existingParts[0] || '', date: slot.date, time: slot.time, court: slot.court, session_type: slot.session_type || null })
+  const [partner, setPartner] = useState(existingParts[1] || '')
   const [loading, setLoading] = useState(false)
 
   const handleSave = async () => {
     setLoading(true)
     try {
-      await api.put(`/slots/${slot.id}`, form)
+      const payload = { ...form }
+      if (form.session_type === 'group' && partner.trim()) {
+        payload.player_text = `${form.player_text} / ${partner.trim()}`
+      }
+      await api.put(`/slots/${slot.id}`, payload)
       onSaved()
     } catch {}
     setLoading(false)
@@ -430,41 +540,163 @@ function EditSlotModal({ slot, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md">
-      <div className="w-full max-w-sm glass-panel rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6">
+      <div className="w-full max-w-sm glass-panel rounded-2xl border border-theme shadow-2xl p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white">Edit Slot</h3>
-          <button onClick={onClose} className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg"><X className="w-5 h-5" /></button>
+          <h3 className="text-lg font-bold text-theme">Edit Slot</h3>
+          <button onClick={onClose} className="p-2 text-muted hover:text-theme hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg"><X className="w-5 h-5" /></button>
         </div>
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Player Name</label>
-            <input type="text" value={form.player_text} onChange={e => setForm({ ...form, player_text: e.target.value })} className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs" />
+            <label className="block text-xs font-semibold text-theme uppercase mb-1">Player Name</label>
+            <PlayerAutocomplete value={form.player_text} onChange={val => setForm({ ...form, player_text: val })} />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Date</label>
-            <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs" />
+            <label className="block text-xs font-semibold text-theme uppercase mb-1">Session Type</label>
+            {slot.booking_id ? (
+              <div className="w-full px-3 py-2 rounded-xl bg-surface border-theme border border-theme text-muted text-xs">
+                {form.session_type || 'Not set'} <span className="text-[10px]">(linked to booking)</span>
+              </div>
+            ) : (
+              <select value={form.session_type || ''} onChange={e => setForm({ ...form, session_type: e.target.value || null })} className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs">
+                <option value="">None</option>
+                <option value="private">Private</option>
+                <option value="group">Group</option>
+              </select>
+            )}
+          </div>
+          {form.session_type === 'group' && (
+            <div>
+              <label className="block text-xs font-semibold text-theme uppercase mb-1">Partner</label>
+              <PlayerAutocomplete value={partner} onChange={setPartner} placeholder="e.g. Zain" />
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-semibold text-theme uppercase mb-1">Date</label>
+            <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Time</label>
-            <select value={form.time} onChange={e => setForm({ ...form, time: e.target.value })} className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs">
+            <label className="block text-xs font-semibold text-theme uppercase mb-1">Time</label>
+            <select value={form.time} onChange={e => setForm({ ...form, time: e.target.value })} className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs">
               {ALL_TIMES.map(t => <option key={t} value={t}>{TIME_LABELS[t]}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase mb-1">Court</label>
-            <select value={form.court} onChange={e => setForm({ ...form, court: parseInt(e.target.value) })} className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs">
+            <label className="block text-xs font-semibold text-theme uppercase mb-1">Court</label>
+            <select value={form.court} onChange={e => setForm({ ...form, court: parseInt(e.target.value) })} className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs">
               <option value={1}>Court 1</option>
               <option value={2}>Court 2</option>
+              <option value={3}>Court 3</option>
             </select>
           </div>
         </div>
         <div className="flex gap-3 mt-4">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-semibold">Cancel</button>
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-surface border border-theme text-theme text-sm font-semibold">Cancel</button>
           <button onClick={handleSave} disabled={loading} className="flex-1 py-2.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-bold text-sm disabled:opacity-50">
             {loading ? 'Saving...' : 'Save'}
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+function PlayerAutocomplete({ value, onChange, onPlayerSelect, placeholder }) {
+  const [query, setQuery] = useState(value || '')
+  const [suggestions, setSuggestions] = useState([])
+  const [open, setOpen] = useState(false)
+  const [activeIdx, setActiveIdx] = useState(-1)
+  const wrapRef = useRef(null)
+  const debounceRef = useRef(null)
+
+  useEffect(() => { setQuery(value || '') }, [value])
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const fetchSuggestions = (q) => {
+    if (q.length < 3) { setSuggestions([]); return }
+    api.get(`/players?search=${encodeURIComponent(q)}&limit=10`).then(data => {
+      setSuggestions(data.players || [])
+      setOpen(true)
+    }).catch(() => setSuggestions([]))
+  }
+
+  const handleInput = (val) => {
+    setQuery(val)
+    onChange(val)
+    setActiveIdx(-1)
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => fetchSuggestions(val), 250)
+  }
+
+  const selectName = (name, player) => {
+    const parts = query.split(/[/+]/)
+    parts[parts.length - 1] = name
+    const newVal = parts.join(query.includes('/') ? ' / ' : ' + ')
+    setQuery(newVal)
+    onChange(newVal)
+    setOpen(false)
+    if (onPlayerSelect && player) onPlayerSelect(player)
+  }
+
+  const addNewPlayer = () => {
+    setOpen(false)
+  }
+
+  const handleKeyDown = (e) => {
+    const items = [...suggestions, { full_name: `Add '${query}' as new player` }]
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, items.length - 1)) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, -1)) }
+    else if (e.key === 'Enter' && activeIdx >= 0) {
+      e.preventDefault()
+      if (activeIdx < suggestions.length) selectName(suggestions[activeIdx].full_name, suggestions[activeIdx])
+      else addNewPlayer()
+    }
+    else if (e.key === 'Escape') setOpen(false)
+  }
+
+  const items = suggestions.map(s => s.full_name)
+  const showAddNew = query.length >= 3 && !items.some(n => n.toLowerCase() === query.toLowerCase())
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <input
+        type="text"
+        value={query}
+        onChange={e => handleInput(e.target.value)}
+        onFocus={() => query.length >= 3 && (suggestions.length > 0 || showAddNew) && setOpen(true)}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder || 'e.g. Zain'}
+        className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs"
+      />
+      {open && (suggestions.length > 0 || showAddNew) && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-surface border border-theme rounded-xl shadow-xl max-h-48 overflow-y-auto">
+          {suggestions.map((s, i) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => selectName(s.full_name, s)}
+              className={`w-full text-left px-3 py-2 text-xs ${i === activeIdx ? 'bg-lime-400/10 text-lime-400' : 'text-theme hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+            >
+              {s.full_name}
+            </button>
+          ))}
+          {showAddNew && (
+            <button
+              type="button"
+              onClick={addNewPlayer}
+              className={`w-full text-left px-3 py-2 text-xs border-t border-theme ${activeIdx === suggestions.length ? 'bg-lime-400/10 text-lime-400' : 'text-muted italic hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+            >
+              Add '{query}' as new player
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

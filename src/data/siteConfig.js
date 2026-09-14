@@ -11,4 +11,4 @@ export const CONTACT = {
 
 export const ACADEMY_NAME = 'MM Padel Academy'
 export const TAGLINE = 'Train. Improve. Compete.'
-export const COURTS = 2
+export const COURTS = 3

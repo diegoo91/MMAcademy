@@ -30,6 +30,18 @@ function notify(userId, kind, title, body, link) {
   db.insert('notifications', { user_id: userId, kind, title, body, link: link || null, read: 0 })
 }
 
+function updateUserBalance(userId, newPriv, newGrp) {
+  const now = new Date().toISOString()
+  const bothZero = newPriv <= 0 && newGrp <= 0
+  const updates = { private_balance: newPriv, group_balance: newGrp }
+  if (bothZero) {
+    updates.balance_zero_since = now
+  } else {
+    updates.balance_zero_since = null
+  }
+  db.update('users', userId, updates)
+}
+
 router.get('/', (req, res) => {
   try {
     const { status, page = 1, limit = 50, includeCancelled } = req.query
@@ -64,9 +76,38 @@ router.post('/', (req, res) => {
       ref, user_id: req.user?.id || null, session_type: sessionType, mode,
       sessions_json: JSON.stringify(sessions), total: totalPrice, status: 'pending',
       player_name: req.user?.name || null,
-      private_remaining: 0,
-      group_remaining: 0,
+      private_remaining: 0, group_remaining: 0,
+      deducted_from: null, deducted_count: null,
     })
+
+    // Create a booking request for admin approval
+    if (sessions && sessions.length > 0) {
+      const firstSession = sessions[0]
+      const existingSlot = db.find('slots', s => s.date === firstSession.date && s.time === firstSession.time && s.court === firstSession.court)
+      if (!existingSlot) {
+        const slot = db.insert('slots', {
+          date: firstSession.date, time: firstSession.time, court: firstSession.court,
+          player_text: req.user?.name || 'Player', booking_id: booking.id,
+          user_id: req.user?.id || null, session_type: sessionType, status: 'pending'
+        })
+        db.insert('booking_requests', {
+          kind: 'new_booking', slot_id: slot.id, booking_id: booking.id,
+          player_id: req.user?.id || null, player_name: req.user?.name || 'Player',
+          payload: { sessions_json: JSON.stringify(sessions), session_type: sessionType, total: totalPrice },
+          status: 'pending',
+        })
+        const admins = db.findAll('users', u => u.role === 'superadmin' || u.role === 'admin')
+        for (const admin of admins) {
+          db.insert('notifications', {
+            user_id: admin.id, kind: 'new_booking_request',
+            title: 'New Booking Request',
+            body: `${req.user?.name || 'Player'} requested ${sessionType} booking for ${firstSession.date} ${firstSession.time}.`,
+            link: '/admin/bookings', read: 0
+          })
+        }
+      }
+    }
+
     res.status(201).json(booking)
   } catch (err) {
     console.error('Create booking error:', err)
@@ -97,11 +138,43 @@ router.put('/:id/status', requireRole('superadmin', 'admin'), (req, res) => {
           for (const s of sessions) {
             db.upsert('slots',
               ['date', 'time', 'court'],
-              { date: s.date, time: s.time, court: s.court, player_text: playerName, booking_id: booking.id, user_id: booking.user_id }
+              { date: s.date, time: s.time, court: s.court, player_text: playerName, booking_id: booking.id, user_id: booking.user_id, session_type: booking.session_type, status: 'confirmed' }
             )
           }
         } catch (e) {
           console.error('Auto-create slots failed:', e)
+        }
+      }
+
+      if (booking.user_id) {
+        const user = db.get('users', booking.user_id)
+        if (user) {
+          const sessionCount = sessions.length
+          if (booking.session_type === 'private') {
+            if ((user.private_balance || 0) < sessionCount) {
+              return res.status(400).json({ error: `Insufficient private balance. Need ${sessionCount}, have ${user.private_balance || 0}` })
+            }
+            updateUserBalance(user.id, (user.private_balance || 0) - sessionCount, user.group_balance || 0)
+            db.update('bookings', booking.id, { deducted_from: 'private', deducted_count: sessionCount })
+          } else if (booking.session_type === 'group') {
+            let newPriv = user.private_balance || 0
+            let newGrp = user.group_balance || 0
+            let sessionsLeft = sessionCount
+            const useGroup = Math.min(newGrp, sessionsLeft)
+            newGrp -= useGroup
+            sessionsLeft -= useGroup
+            if (sessionsLeft > 0) {
+              const conv = Math.ceil(sessionsLeft / 2)
+              if (newPriv < conv) {
+                return res.status(400).json({ error: `Insufficient balance. Need ${sessionCount} group sessions, have ${user.group_balance || 0} group + ${user.private_balance || 0} private (can convert ${(user.private_balance || 0) * 2} group)` })
+              }
+              newPriv -= conv
+              newGrp += conv * 2
+              sessionsLeft -= conv * 2
+            }
+            updateUserBalance(user.id, newPriv, newGrp)
+            db.update('bookings', booking.id, { deducted_from: 'group', deducted_count: sessionCount })
+          }
         }
       }
 
@@ -114,6 +187,18 @@ router.put('/:id/status', requireRole('superadmin', 'admin'), (req, res) => {
       freeSlotsForBooking(booking)
       updates.private_remaining = 0
       updates.group_remaining = 0
+
+      if (booking.user_id) {
+        const user = db.get('users', booking.user_id)
+        if (user && booking.deducted_from) {
+          const count = booking.deducted_count || (booking.sessions_json ? JSON.parse(booking.sessions_json).length : 0)
+          if (booking.deducted_from === 'private') {
+            updateUserBalance(user.id, (user.private_balance || 0) + count, user.group_balance || 0)
+          } else if (booking.deducted_from === 'group') {
+            updateUserBalance(user.id, user.private_balance || 0, (user.group_balance || 0) + count)
+          }
+        }
+      }
 
       if (booking.user_id) {
         notify(booking.user_id, 'booking_cancelled', 'Booking Cancelled', `Your booking ${booking.ref} has been cancelled.`, '/schedule')
@@ -167,7 +252,7 @@ router.put('/:id/sessions', requireRole('superadmin', 'admin'), (req, res) => {
       for (const s of sessions) {
         db.upsert('slots',
           ['date', 'time', 'court'],
-          { date: s.date, time: s.time, court: s.court, player_text: playerName, booking_id: booking.id, user_id: booking.user_id }
+          { date: s.date, time: s.time, court: s.court, player_text: playerName, booking_id: booking.id, user_id: booking.user_id, session_type: sessionType || booking.session_type, status: 'confirmed' }
         )
       }
     }
@@ -245,6 +330,17 @@ router.delete('/:id', requireRole('superadmin', 'admin'), (req, res) => {
 
     if (booking.status === 'confirmed') {
       freeSlotsForBooking(booking)
+      if (booking.user_id && booking.deducted_from) {
+        const user = db.get('users', booking.user_id)
+        if (user) {
+          const count = booking.deducted_count || (booking.sessions_json ? JSON.parse(booking.sessions_json).length : 0)
+          if (booking.deducted_from === 'private') {
+            db.update('users', user.id, { private_balance: (user.private_balance || 0) + count })
+          } else if (booking.deducted_from === 'group') {
+            db.update('users', user.id, { group_balance: (user.group_balance || 0) + count })
+          }
+        }
+      }
     }
 
     db.remove('bookings', parseInt(req.params.id))

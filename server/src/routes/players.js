@@ -9,12 +9,11 @@ router.use(authenticate)
 router.get('/', (req, res) => {
   try {
     const { search, skill, page = 1, limit = 50 } = req.query
-    const all = db.findAll('players')
+    let filtered = db.findAll('users', u => u.role === 'player')
     const allSlots = db.findAll('slots')
-    let filtered = all
     if (search) {
       const q = search.toLowerCase()
-      filtered = filtered.filter(p => p.full_name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q) || (p.phone && p.phone.includes(q)))
+      filtered = filtered.filter(p => (p.name || '').toLowerCase().includes(q) || p.email.toLowerCase().includes(q) || (p.phone && p.phone.includes(q)))
     }
     if (skill) filtered = filtered.filter(p => p.skill_level === skill)
     filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
@@ -24,9 +23,9 @@ router.get('/', (req, res) => {
       const sessions = allSlots.filter(s => {
         if (!s.player_text) return false
         const names = s.player_text.split(/[/+]/).map(n => n.trim().toLowerCase())
-        return names.includes(p.full_name.toLowerCase())
+        return names.includes((p.name || '').toLowerCase())
       }).length
-      return { ...p, remaining_sessions: sessions }
+      return { id: p.id, full_name: p.name, email: p.email, phone: p.phone, dob: p.dob, skill_level: p.skill_level, position: p.position || '', notes: p.notes || '', private_balance: p.private_balance || 0, group_balance: p.group_balance || 0, balance_zero_since: p.balance_zero_since || null, remaining_sessions: sessions, created_at: p.created_at, updated_at: p.updated_at }
     })
     res.json({ players, total, page: parseInt(page), limit: parseInt(limit) })
   } catch (err) {
@@ -38,9 +37,9 @@ router.get('/', (req, res) => {
 router.get('/:id/sessions', (req, res) => {
   try {
     const id = parseInt(req.params.id)
-    const player = db.get('players', id)
-    if (!player) return res.status(404).json({ error: 'Player not found' })
-    const playerName = player.full_name.toLowerCase()
+    const player = db.get('users', id)
+    if (!player || player.role !== 'player') return res.status(404).json({ error: 'Player not found' })
+    const playerName = (player.name || '').toLowerCase()
     const allSlots = db.findAll('slots')
     const sessions = allSlots
       .filter(s => {
@@ -51,14 +50,9 @@ router.get('/:id/sessions', (req, res) => {
       .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time))
       .map(s => {
         const booking = s.booking_id ? db.get('bookings', s.booking_id) : null
-        return {
-          date: s.date, time: s.time, court: s.court,
-          session_type: booking ? booking.session_type : null,
-          paid: booking ? !!booking.paid : null,
-          booking_ref: booking ? booking.ref : null,
-        }
+        return { date: s.date, time: s.time, court: s.court, session_type: booking ? booking.session_type : null, paid: booking ? !!booking.paid : null, booking_ref: booking ? booking.ref : null }
       })
-    res.json({ player: { id: player.id, full_name: player.full_name }, sessions })
+    res.json({ player: { id: player.id, full_name: player.name }, sessions })
   } catch (err) {
     console.error('Player sessions error:', err)
     res.status(500).json({ error: 'Internal server error' })
@@ -67,9 +61,10 @@ router.get('/:id/sessions', (req, res) => {
 
 router.get('/:id', (req, res) => {
   try {
-    const player = db.get('players', parseInt(req.params.id))
-    if (!player) return res.status(404).json({ error: 'Player not found' })
-    res.json(player)
+    const player = db.get('users', parseInt(req.params.id))
+    if (!player || player.role !== 'player') return res.status(404).json({ error: 'Player not found' })
+    const { password_hash, ...safe } = player
+    res.json({ ...safe, full_name: safe.name })
   } catch (err) {
     console.error('Get player error:', err)
     res.status(500).json({ error: 'Internal server error' })
@@ -80,11 +75,18 @@ router.post('/', requireRole('superadmin', 'admin'), (req, res) => {
   try {
     const { full_name, email, phone, dob, skill_level, notes } = req.body
     if (!full_name || !email) return res.status(400).json({ error: 'Full name and email are required' })
-    if (db.find('players', p => p.email === email)) return res.status(409).json({ error: 'Email already exists' })
+    if (db.find('users', u => u.email === email)) return res.status(409).json({ error: 'Email already exists' })
     const validSkills = ['Beginner', 'Intermediate', 'Advanced']
     if (skill_level && !validSkills.includes(skill_level)) return res.status(400).json({ error: 'Invalid skill level' })
-    const player = db.insert('players', { full_name, email, phone: phone || '', dob: dob || '', skill_level: skill_level || 'Intermediate', notes: notes || '' })
-    res.status(201).json(player)
+    const user = db.insert('users', {
+      name: full_name, email, phone: phone || '', dob: dob || '',
+      role: 'player', password_hash: null, is_claimed: false,
+      skill_level: skill_level || 'Intermediate', notes: notes || '',
+      private_balance: 0, group_balance: 0,
+      member_since: new Date().getFullYear().toString(), force_password_change: 1,
+    })
+    const { password_hash, ...safe } = user
+    res.status(201).json({ ...safe, full_name: safe.name })
   } catch (err) {
     console.error('Create player error:', err)
     res.status(500).json({ error: 'Internal server error' })
@@ -94,20 +96,26 @@ router.post('/', requireRole('superadmin', 'admin'), (req, res) => {
 router.put('/:id', requireRole('superadmin', 'admin'), (req, res) => {
   try {
     const id = parseInt(req.params.id)
-    const player = db.get('players', id)
-    if (!player) return res.status(404).json({ error: 'Player not found' })
-    const { full_name, email, phone, dob, skill_level, notes } = req.body
+    const player = db.get('users', id)
+    if (!player || player.role !== 'player') return res.status(404).json({ error: 'Player not found' })
+    const { full_name, email, phone, dob, skill_level, position, notes, private_balance, group_balance } = req.body
     const validSkills = ['Beginner', 'Intermediate', 'Advanced']
     if (skill_level && !validSkills.includes(skill_level)) return res.status(400).json({ error: 'Invalid skill level' })
-    const updated = db.update('players', id, {
-      full_name: full_name || player.full_name,
+    const validPositions = ['Right', 'Left', '']
+    if (position && !validPositions.includes(position)) return res.status(400).json({ error: 'Invalid position' })
+    const updated = db.update('users', id, {
+      name: full_name || player.name,
       email: email || player.email,
       phone: phone ?? player.phone,
       dob: dob ?? player.dob,
       skill_level: skill_level || player.skill_level,
-      notes: notes ?? player.notes
+      position: position !== undefined ? position : player.position,
+      notes: notes ?? player.notes,
+      private_balance: private_balance !== undefined ? Number(private_balance) : player.private_balance,
+      group_balance: group_balance !== undefined ? Number(group_balance) : player.group_balance,
     })
-    res.json(updated)
+    const { password_hash, ...safe } = updated
+    res.json({ ...safe, full_name: safe.name })
   } catch (err) {
     console.error('Update player error:', err)
     res.status(500).json({ error: 'Internal server error' })
@@ -116,8 +124,9 @@ router.put('/:id', requireRole('superadmin', 'admin'), (req, res) => {
 
 router.delete('/:id', requireRole('superadmin', 'admin'), (req, res) => {
   try {
-    if (!db.get('players', parseInt(req.params.id))) return res.status(404).json({ error: 'Player not found' })
-    db.remove('players', parseInt(req.params.id))
+    const player = db.get('users', parseInt(req.params.id))
+    if (!player || player.role !== 'player') return res.status(404).json({ error: 'Player not found' })
+    db.remove('users', parseInt(req.params.id))
     res.json({ ok: true })
   } catch (err) {
     console.error('Delete player error:', err)

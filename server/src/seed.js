@@ -148,25 +148,21 @@ try {
 
 console.log(`Seeded ${slotsCreated} schedule slots from Excel.`)
 
-db.clear('players')
-console.log('Cleared existing players.')
-
 const uniqueNames = [...allIndividualNames].sort()
 let playersCreated = 0
 for (const name of uniqueNames) {
   const email = generateEmail(name)
-  if (db.find('players', p => p.email === email)) continue
-  db.insert('players', {
-    full_name: name,
-    email,
-    phone: '',
-    dob: '',
-    skill_level: 'Intermediate',
-    notes: '',
+  if (db.find('users', u => u.email === email)) continue
+  db.insert('users', {
+    name, email, phone: '', dob: '',
+    role: 'player', password_hash: null, is_claimed: false,
+    skill_level: 'Intermediate', notes: '',
+    private_balance: 0, group_balance: 0,
+    member_since: new Date().getFullYear().toString(), force_password_change: 1,
   })
   playersCreated++
 }
-console.log(`Seeded ${playersCreated} players from schedule.`)
+console.log(`Seeded ${playersCreated} player-users from schedule.`)
 
 const allBookings = db.findAll('bookings')
 for (const b of allBookings) {

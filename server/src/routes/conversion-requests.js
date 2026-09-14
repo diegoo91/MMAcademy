@@ -16,23 +16,21 @@ router.post('/', (req, res) => {
     if (req.user.role !== 'player' && req.user.role !== 'superadmin' && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Only players can submit conversion requests' })
     }
-    const { booking_id, from, to, count } = req.body
+    const { from, to, count } = req.body
     if (!from || !to || !count || count <= 0) return res.status(400).json({ error: 'Invalid request params' })
     if (from === to) return res.status(400).json({ error: 'Cannot convert same type' })
 
-    const booking = db.get('bookings', parseInt(booking_id))
-    if (!booking) return res.status(404).json({ error: 'Booking not found' })
-    if (booking.user_id !== req.user.id && req.user.role === 'player') return res.status(403).json({ error: 'Not your booking' })
+    const user = db.get('users', req.user.id)
+    if (!user) return res.status(404).json({ error: 'User not found' })
 
-    const privRemaining = booking.private_remaining || 0
-    const groupRemaining = booking.group_remaining || 0
+    const privBalance = user.private_balance || 0
+    const grpBalance = user.group_balance || 0
 
-    if (from === 'private' && count > privRemaining) return res.status(400).json({ error: `Insufficient private credits (${privRemaining} available)` })
-    if (from === 'group' && count * 2 > groupRemaining) return res.status(400).json({ error: `Insufficient group credits (${groupRemaining} available, need ${count * 2})` })
+    if (from === 'private' && count > privBalance) return res.status(400).json({ error: `Insufficient private balance (${privBalance} available)` })
+    if (from === 'group' && count * 2 > grpBalance) return res.status(400).json({ error: `Insufficient group balance (${grpBalance} available, need ${count * 2})` })
 
     const admins = db.findAll('users', u => u.role === 'superadmin' || u.role === 'admin')
     const request = db.insert('conversion_requests', {
-      booking_id: booking.id,
       user_id: req.user.id,
       user_name: req.user.name,
       from,
@@ -71,23 +69,23 @@ router.put('/:id/approve', requireRole('superadmin', 'admin'), (req, res) => {
     if (!request) return res.status(404).json({ error: 'Request not found' })
     if (request.status !== 'pending') return res.status(400).json({ error: 'Request already processed' })
 
-    const booking = db.get('bookings', request.booking_id)
-    if (!booking) return res.status(404).json({ error: 'Booking not found' })
+    const user = request.user_id ? db.get('users', request.user_id) : null
+    if (!user) return res.status(404).json({ error: 'User not found' })
 
-    const privRemaining = booking.private_remaining || 0
-    const groupRemaining = booking.group_remaining || 0
+    const privBalance = user.private_balance || 0
+    const grpBalance = user.group_balance || 0
 
     if (request.from === 'private' && request.to === 'group') {
-      if (privRemaining < request.count) return res.status(400).json({ error: 'Insufficient credits' })
-      db.update('bookings', booking.id, {
-        private_remaining: privRemaining - request.count,
-        group_remaining: groupRemaining + request.count * 2,
+      if (privBalance < request.count) return res.status(400).json({ error: 'Insufficient credits' })
+      db.update('users', user.id, {
+        private_balance: privBalance - request.count,
+        group_balance: grpBalance + request.count * 2,
       })
     } else if (request.from === 'group' && request.to === 'private') {
-      if (groupRemaining < request.count * 2) return res.status(400).json({ error: 'Insufficient credits' })
-      db.update('bookings', booking.id, {
-        group_remaining: groupRemaining - request.count * 2,
-        private_remaining: privRemaining + request.count,
+      if (grpBalance < request.count * 2) return res.status(400).json({ error: 'Insufficient credits' })
+      db.update('users', user.id, {
+        group_balance: grpBalance - request.count * 2,
+        private_balance: privBalance + request.count,
       })
     }
 

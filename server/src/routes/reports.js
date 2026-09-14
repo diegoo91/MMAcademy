@@ -59,6 +59,45 @@ router.get('/summary', (req, res) => {
       .map(([name, count]) => ({ name, sessions: count }))
       .sort((a, b) => b.sessions - a.sessions)
 
+    let allResults = db.findAll('results')
+    if (rangeFrom) allResults = allResults.filter(r => r.date >= rangeFrom)
+    if (rangeTo) allResults = allResults.filter(r => r.date <= rangeTo)
+
+    const confirmedResults = allResults.filter(r => r.status === 'confirmed')
+    const playerStats = {}
+    for (const r of confirmedResults) {
+      const allPlayers = [...(r.sideA || [r.player_a]), ...(r.sideB || [r.player_b])]
+
+      for (const p of allPlayers) {
+        if (!playerStats[p]) playerStats[p] = { name: p, played: 0, wins: 0, losses: 0, partners: {}, opponents: {} }
+        playerStats[p].played++
+
+        const isSideA = (r.sideA || []).includes(p) || r.player_a === p
+        const mySide = isSideA ? 'A' : 'B'
+        const won = r.winner_side === mySide
+        if (won) playerStats[p].wins++
+        else playerStats[p].losses++
+
+        const mySidePlayers = isSideA ? (r.sideA || []) : (r.sideB || [])
+        for (const mate of mySidePlayers) {
+          if (mate !== p) {
+            playerStats[p].partners[mate] = (playerStats[p].partners[mate] || 0) + 1
+          }
+        }
+
+        const otherSide = isSideA ? (r.sideB || []) : (r.sideA || [])
+        for (const opp of otherSide) {
+          playerStats[p].opponents[opp] = (playerStats[p].opponents[opp] || 0) + 1
+        }
+      }
+    }
+
+    const matchResults = Object.values(playerStats).map(p => ({
+      ...p,
+      partners: Object.entries(p.partners).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
+      opponents: Object.entries(p.opponents).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
+    })).sort((a, b) => b.played - a.played)
+
     let expenses = db.findAll('expenses')
     if (rangeFrom) expenses = expenses.filter(e => e.date >= rangeFrom)
     if (rangeTo) expenses = expenses.filter(e => e.date <= rangeTo)
@@ -67,7 +106,7 @@ router.get('/summary', (req, res) => {
     const totalExpenses = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0)
 
     res.json({
-      payments, scheduleHistory, sessionsPerPlayer,
+      payments, scheduleHistory, sessionsPerPlayer, matchResults,
       profit: { revenue: totalRevenue, expenses: totalExpenses, net: totalRevenue - totalExpenses },
       range: { from: rangeFrom, to: rangeTo, preset: preset || 'custom' },
     })

@@ -23,7 +23,7 @@ import Reports from './pages/admin/Reports'
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth()
-  if (loading) return <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center"><div className="w-8 h-8 border-2 border-lime-400 border-t-transparent rounded-full animate-spin" /></div>
+  if (loading) return <div className="min-h-screen bg-theme flex items-center justify-center"><div className="w-8 h-8 border-2 border-lime-400 border-t-transparent rounded-full animate-spin" /></div>
   if (!user) return <Navigate to="/login" replace />
   if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />
   return children
@@ -33,7 +33,7 @@ function AppRoutes() {
   const { loading } = useAuth()
 
   if (loading) {
-    return <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center"><div className="w-8 h-8 border-2 border-lime-400 border-t-transparent rounded-full animate-spin" /></div>
+    return <div className="min-h-screen bg-theme flex items-center justify-center"><div className="w-8 h-8 border-2 border-lime-400 border-t-transparent rounded-full animate-spin" /></div>
   }
 
   return (

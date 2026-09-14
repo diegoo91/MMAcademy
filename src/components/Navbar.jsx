@@ -55,24 +55,24 @@ export default function Navbar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 w-full glass-panel border-b border-slate-200 dark:border-slate-800/80">
+    <header className="sticky top-0 z-40 w-full glass-panel border-b border-theme">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           <Link to="/" className="flex items-center gap-3 group">
-            <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-lime-400/80 shadow-lg shadow-lime-400/20 group-hover:scale-105 transition-transform bg-slate-200 dark:bg-slate-900 shrink-0">
+            <div                 className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-lime-400/80 shadow-lg shadow-lime-400/20 group-hover:scale-105 transition-transform bg-surface shrink-0">
               <img src="/images/logo.jpg" alt="MM Padel Academy Logo" className="w-full h-full object-cover" />
             </div>
             <div className="flex flex-col">
-              <span className="font-heading text-xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
+              <span className="font-heading text-xl font-extrabold tracking-tight text-theme flex items-center gap-1.5">
                 MM <span className="text-lime-400">PADEL</span> ACADEMY
               </span>
-              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-widest -mt-1">
+              <span className="text-[10px] uppercase font-bold text-muted tracking-widest -mt-1">
                 Train &bull; Improve &bull; Compete
               </span>
             </div>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-1 bg-white/60 dark:bg-slate-900/60 p-1.5 rounded-full border border-slate-200 dark:border-slate-800/80">
+          <nav className="hidden md:flex items-center gap-1 bg-surface p-1.5 rounded-full border border-theme">
             {navLinks.map((link) => {
               const active = isActive(link.path)
               return (
@@ -82,7 +82,7 @@ export default function Navbar() {
                   className={`px-5 py-2 rounded-full text-sm font-semibold transition-all ${
                     active
                       ? 'bg-lime-400 text-slate-950 shadow-md shadow-lime-400/20'
-                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50'
+                      : 'text-theme hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50'
                   }`}
                 >
                   {link.name}
@@ -95,19 +95,19 @@ export default function Navbar() {
             <div className="relative">
               <button
                 onClick={() => setShowThemeMenu(!showThemeMenu)}
-                className="p-2.5 rounded-xl bg-white/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                className="p-2.5 rounded-xl bg-surface border border-theme text-muted hover:text-theme hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
                 title="Theme"
               >
                 <Palette className="w-4 h-4" />
               </button>
               {showThemeMenu && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-2 z-50">
+                <div className="absolute right-0 top-full mt-2 w-48 bg-surface border border-theme rounded-xl shadow-2xl p-2 z-50">
                   {themes.map(t => (
                     <button
                       key={t.id}
                       onClick={() => { setTheme(t.id); setShowThemeMenu(false) }}
                       className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-between ${
-                        theme === t.id ? 'bg-lime-400/10 text-lime-400' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        theme === t.id ? 'bg-lime-400/10 text-lime-400' : 'text-theme hover:bg-slate-100 dark:hover:bg-slate-800'
                       }`}
                     >
                       <span>{t.label}</span>
@@ -120,7 +120,7 @@ export default function Navbar() {
 
             {user && (
               <div className="relative group">
-                <button className="relative p-2.5 rounded-xl bg-white/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
+                <button                 className="relative p-2.5 rounded-xl bg-surface border border-theme text-muted hover:text-theme hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
                   <Bell className="w-4 h-4" />
                   {unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
@@ -128,22 +128,36 @@ export default function Navbar() {
                     </span>
                   )}
                 </button>
-                <div className="invisible group-hover:visible absolute right-0 top-full mt-2 w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 max-h-96 overflow-y-auto">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800">
-                    <span className="text-xs font-bold text-slate-900 dark:text-white">Notifications</span>
+                <div className="invisible group-hover:visible absolute right-0 top-full mt-2 w-80 bg-surface border border-theme rounded-xl shadow-2xl z-50 max-h-96 overflow-y-auto">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-theme">
+                    <span className="text-xs font-bold text-theme">Notifications</span>
                     {unreadCount > 0 && (
                       <button onClick={markAllRead} className="text-[10px] text-lime-400 font-semibold hover:underline">Mark all read</button>
                     )}
                   </div>
                   {notifications.length === 0 ? (
-                    <p className="px-4 py-6 text-xs text-slate-400 dark:text-slate-500 text-center">No notifications</p>
+                    <p className="px-4 py-6 text-xs text-muted text-center">No notifications</p>
                   ) : (
                     notifications.slice(0, 10).map(n => (
-                      <div key={n.id} className={`px-4 py-3 border-b border-slate-200/50 dark:border-slate-800/50 ${!n.read ? 'bg-lime-400/5' : ''}`}>
-                        <p className="text-xs font-bold text-slate-900 dark:text-white">{n.title}</p>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{n.body}</p>
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">{n.created_at?.slice(0, 16)}</p>
-                      </div>
+                      <button
+                        key={n.id}
+                        onClick={() => {
+                          if (!n.read) {
+                            api.put(`/notifications/${n.id}/read`).then(() => {
+                              setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: 1 } : x))
+                              setUnreadCount(prev => Math.max(0, prev - 1))
+                            }).catch(() => {})
+                          }
+                          if (n.link) {
+                            navigate(n.link)
+                          }
+                        }}
+                        className={`w-full text-left px-4 py-3 border-b border-theme hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors ${!n.read ? 'bg-lime-400/5' : ''}`}
+                      >
+                        <p className="text-xs font-bold text-theme">{n.title}</p>
+                        <p className="text-[11px] text-muted mt-0.5">{n.body}</p>
+                        <p className="text-[10px] text-muted mt-1">{n.created_at?.slice(0, 16)}</p>
+                      </button>
                     ))
                   )}
                 </div>
@@ -151,13 +165,13 @@ export default function Navbar() {
             )}
 
             {user ? (
-              <div className="flex items-center gap-3 bg-white/80 dark:bg-slate-900/80 pl-3 pr-2 py-1.5 rounded-full border border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-3 bg-surface pl-3 pr-2 py-1.5 rounded-full border border-theme">
                 <Link to="/profile" className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-full bg-lime-400/20 text-lime-400 flex items-center justify-center font-bold text-xs border border-lime-400/40">
                     {user.name.charAt(0)}
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-xs font-bold text-slate-900 dark:text-white leading-tight">{user.name}</span>
+                    <span className="text-xs font-bold text-theme leading-tight">{user.name}</span>
                     <span className="text-[10px] text-lime-400 font-medium flex items-center gap-1">
                       {(user.role === 'superadmin' || user.role === 'admin' || user.role === 'coach') && (
                         <Shield className="w-3 h-3" />
@@ -178,7 +192,7 @@ export default function Navbar() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={openLoginModal}
-                  className="px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 rounded-full transition-all"
+                  className="px-4 py-2 text-sm font-semibold text-theme hover:text-theme hover:bg-slate-100 dark:hover:bg-slate-800/60 rounded-full transition-all"
                 >
                   Log In
                 </button>
@@ -196,7 +210,7 @@ export default function Navbar() {
           <div className="md:hidden flex items-center gap-2">
             {user && (
               <div className="relative">
-                <button className="relative p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
+                <button className="relative p-2 rounded-xl bg-surface border border-theme text-theme">
                   <Bell className="w-4 h-4" />
                   {unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-rose-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
@@ -208,7 +222,7 @@ export default function Navbar() {
             )}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white focus:outline-none"
+              className="p-2.5 rounded-xl bg-surface border border-theme text-theme hover:text-theme focus:outline-none"
               aria-label="Toggle menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -218,7 +232,7 @@ export default function Navbar() {
       </div>
 
       {mobileMenuOpen && (
-        <div className="md:hidden bg-white/95 dark:bg-slate-950/95 border-b border-slate-200 dark:border-slate-800 px-4 pt-3 pb-6 space-y-3 animate-fadeIn">
+        <div className="md:hidden bg-surface/95 border-b border-theme px-4 pt-3 pb-6 space-y-3 animate-fadeIn">
           {navLinks.map((link) => (
             <Link
               key={link.path}
@@ -227,7 +241,7 @@ export default function Navbar() {
               className={`flex items-center justify-between px-4 py-3 rounded-xl text-base font-semibold transition-colors ${
                 isActive(link.path)
                   ? 'bg-lime-400 text-slate-950 font-bold'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900'
+                  : 'text-theme hover:bg-slate-100 dark:hover:bg-slate-900'
               }`}
             >
               <span>{link.name}</span>
@@ -235,18 +249,18 @@ export default function Navbar() {
             </Link>
           ))}
 
-          <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-2">
+          <div className="pt-4 border-t border-theme flex flex-col gap-2">
             <button
               onClick={toggleTheme}
-              className="w-full py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-semibold text-center text-sm flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-xl bg-surface border border-theme text-theme font-semibold text-center text-sm flex items-center justify-center gap-2"
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
             </button>
             {user ? (
-              <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div className="p-4 rounded-xl bg-surface border border-theme flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-bold text-slate-900 dark:text-white">{user.name}</p>
+                  <p className="text-sm font-bold text-theme">{user.name}</p>
                   <p className="text-xs text-lime-400 flex items-center gap-1">
                     {(user.role === 'superadmin' || user.role === 'admin' || user.role === 'coach') && (
                       <Shield className="w-3 h-3" />
@@ -268,7 +282,7 @@ export default function Navbar() {
                     openLoginModal()
                     setMobileMenuOpen(false)
                   }}
-                  className="w-full py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-semibold text-center text-sm"
+                  className="w-full py-3 rounded-xl bg-surface border border-theme text-theme font-semibold text-center text-sm"
                 >
                   Log In
                 </button>

@@ -24,8 +24,8 @@ router.post('/signup', (req, res) => {
     if (db.find('users', u => u.email === email)) return res.status(409).json({ error: 'Email already registered' })
     const hash = bcrypt.hashSync(password, 12)
     const memberSince = new Date().getFullYear().toString()
-    const user = db.insert('users', { name, email, phone: phone || '', dob: dob || '', password_hash: hash, role: 'player', skill_level: skillLevel || 'Intermediate', member_since: memberSince, force_password_change: 0 })
-    const safe = { id: user.id, name: user.name, email: user.email, role: user.role, skill_level: user.skill_level, force_password_change: 0 }
+    const user = db.insert('users', { name, email, phone: phone || '', dob: dob || '', password_hash: hash, role: 'player', skill_level: skillLevel || 'Intermediate', member_since: memberSince, force_password_change: 0, notes: '', private_balance: 0, group_balance: 0, is_claimed: true })
+    const safe = { id: user.id, name: user.name, email: user.email, role: user.role, skill_level: user.skill_level, force_password_change: 0, private_balance: 0, group_balance: 0 }
     const accessToken = signAccessToken(safe)
     const refreshToken = signRefreshToken(safe)
     res.cookie('refreshToken', refreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000))
@@ -42,7 +42,7 @@ router.post('/login', (req, res) => {
     if (!email || !password) return res.status(400).json({ error: 'Email and password are required' })
     const user = db.find('users', u => u.email === email)
     if (!user || !bcrypt.compareSync(password, user.password_hash)) return res.status(401).json({ error: 'Invalid email or password' })
-    const safe = { id: user.id, name: user.name, email: user.email, role: user.role, skill_level: user.skill_level, force_password_change: user.force_password_change, permissions: getUserPermissions(user) }
+    const safe = { id: user.id, name: user.name, email: user.email, role: user.role, skill_level: user.skill_level, force_password_change: user.force_password_change, permissions: getUserPermissions(user), private_balance: user.private_balance || 0, group_balance: user.group_balance || 0 }
     const accessToken = signAccessToken(safe)
     const refreshToken = signRefreshToken(safe)
     res.cookie('refreshToken', refreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000))
@@ -60,7 +60,7 @@ router.post('/refresh', (req, res) => {
     const payload = verifyRefreshToken(token)
     const user = db.get('users', payload.id)
     if (!user) return res.status(401).json({ error: 'User not found' })
-    const safe = { id: user.id, name: user.name, email: user.email, role: user.role, skill_level: user.skill_level, force_password_change: user.force_password_change, permissions: getUserPermissions(user) }
+    const safe = { id: user.id, name: user.name, email: user.email, role: user.role, skill_level: user.skill_level, force_password_change: user.force_password_change, permissions: getUserPermissions(user), private_balance: user.private_balance || 0, group_balance: user.group_balance || 0 }
     const accessToken = signAccessToken(safe)
     const newRefresh = signRefreshToken(safe)
     res.cookie('refreshToken', newRefresh, cookieOptions(7 * 24 * 60 * 60 * 1000))

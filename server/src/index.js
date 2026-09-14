@@ -21,6 +21,7 @@ import notificationsRoutes from './routes/notifications.js'
 import conversionRequestsRoutes from './routes/conversion-requests.js'
 import expensesRoutes from './routes/expenses.js'
 import reportsRoutes from './routes/reports.js'
+import bookingRequestsRoutes from './routes/booking-requests.js'
 
 const app = express()
 const PORT = process.env.PORT || 5174
@@ -46,6 +47,7 @@ app.use('/api/notifications', notificationsRoutes)
 app.use('/api/conversion-requests', conversionRequestsRoutes)
 app.use('/api/expenses', expensesRoutes)
 app.use('/api/reports', reportsRoutes)
+app.use('/api/booking-requests', bookingRequestsRoutes)
 
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: new Date().toISOString() }))
 

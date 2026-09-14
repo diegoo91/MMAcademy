@@ -31,16 +31,16 @@ export default function AdminLayout() {
 
   const sidebarContent = (collapsed) => (
     <>
-      <div className="p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
+      <div className="p-4 flex items-center justify-between border-b border-theme">
         {(!collapsed || mobileOpen) && (
           <div className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-lime-400" />
-            <span className="font-bold text-slate-900 dark:text-white text-sm">
+            <span className="font-bold text-theme text-sm">
               {user?.role === 'coach' ? 'Coach Panel' : 'Admin Panel'}
             </span>
           </div>
         )}
-        <button onClick={() => mobileOpen ? setMobileOpen(false) : setSidebarOpen(!sidebarOpen)} className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+        <button onClick={() => mobileOpen ? setMobileOpen(false) : setSidebarOpen(!sidebarOpen)} className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-muted hover:text-slate-900 dark:hover:text-white transition-colors">
           {mobileOpen ? <X className="w-4 h-4" /> : <ChevronLeft className={`w-4 h-4 transition-transform ${!sidebarOpen ? 'rotate-180' : ''}`} />}
         </button>
       </div>
@@ -57,7 +57,7 @@ export default function AdminLayout() {
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                 active
                   ? 'bg-lime-400/10 text-lime-400 border border-lime-400/20'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/50'
+                  : 'text-muted hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/50'
               }`}
               title={collapsed ? link.name : undefined}
             >
@@ -68,11 +68,11 @@ export default function AdminLayout() {
         })}
       </nav>
 
-      <div className="p-3 border-t border-slate-200 dark:border-slate-800">
+      <div className="p-3 border-t border-theme">
         <Link
           to="/"
           onClick={() => setMobileOpen(false)}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-all"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-muted hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-all"
         >
           <ChevronLeft className="w-5 h-5 shrink-0" />
           {(!collapsed || mobileOpen) && <span>Back to Site</span>}
@@ -89,15 +89,15 @@ export default function AdminLayout() {
   )
 
   return (
-    <div className="flex min-h-[calc(100vh-5rem)] bg-slate-50 dark:bg-slate-950 relative">
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} hidden md:flex flex-col bg-white/50 dark:bg-slate-900/50 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 shrink-0`}>
+    <div className="flex min-h-[calc(100vh-5rem)] bg-theme relative">
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} hidden md:flex flex-col bg-surface/50 border-r border-theme transition-all duration-300 shrink-0`}>
         {sidebarContent(!sidebarOpen)}
       </aside>
 
       {mobileOpen && (
         <>
           <div className="fixed inset-0 z-40 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-sm md:hidden" onClick={() => setMobileOpen(false)} />
-          <aside className="fixed inset-y-0 left-0 z-50 w-64 flex flex-col bg-slate-100 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 md:hidden animate-fadeIn">
+          <aside className="fixed inset-y-0 left-0 z-50 w-64 flex flex-col bg-surface border-r border-theme md:hidden animate-fadeIn">
             {sidebarContent(false)}
           </aside>
         </>
@@ -105,10 +105,10 @@ export default function AdminLayout() {
 
       <main className="flex-1 p-4 md:p-8 overflow-auto min-w-0">
         <div className="md:hidden flex items-center gap-2 mb-6">
-          <button onClick={() => setMobileOpen(true)} className="p-2 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+          <button onClick={() => setMobileOpen(true)} className="p-2 rounded-lg bg-surface border border-theme text-theme">
             <Menu className="w-5 h-5" />
           </button>
-          <span className="text-sm font-bold text-slate-900 dark:text-white">{user?.role === 'coach' ? 'Coach Panel' : 'Admin Panel'}</span>
+          <span className="text-sm font-bold text-theme">{user?.role === 'coach' ? 'Coach Panel' : 'Admin Panel'}</span>
         </div>
         <Outlet />
       </main>

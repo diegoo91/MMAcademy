@@ -27,8 +27,33 @@ router.put('/:id', requireRole('superadmin', 'admin'), (req, res) => {
     const id = parseInt(req.params.id)
     const slot = db.get('slots', id)
     if (!slot) return res.status(404).json({ error: 'Slot not found' })
-    const { player_text, date, time, court } = req.body
-    const updated = db.update('slots', id, { player_text: player_text ?? slot.player_text, date: date || slot.date, time: time || slot.time, court: court || slot.court })
+    const { player_text, date, time, court, session_type, status } = req.body
+    const newDate = date || slot.date
+    const newTime = time || slot.time
+    const newCourt = court || slot.court
+    const conflict = db.find('slots', s => s.id !== id && s.date === newDate && s.time === newTime && s.court === newCourt)
+    if (conflict) return res.status(409).json({ error: 'Slot already exists at this date/time/court' })
+
+    const updates = {
+      player_text: player_text ?? slot.player_text,
+      date: newDate, time: newTime, court: newCourt,
+      session_type: session_type !== undefined ? session_type : slot.session_type,
+      status: status || slot.status
+    }
+
+    if (player_text !== undefined) {
+      updates.status = player_text?.trim() ? (updates.status === 'pending' ? 'pending' : 'confirmed') : 'available'
+    }
+
+    const updated = db.update('slots', id, updates)
+
+    if (session_type !== undefined && session_type !== slot.session_type && slot.booking_id) {
+      const booking = db.get('bookings', slot.booking_id)
+      if (booking) {
+        db.update('bookings', booking.id, { session_type })
+      }
+    }
+
     res.json(updated)
   } catch (err) {
     console.error('Update slot error:', err)
@@ -38,10 +63,11 @@ router.put('/:id', requireRole('superadmin', 'admin'), (req, res) => {
 
 router.post('/', requireRole('superadmin', 'admin'), (req, res) => {
   try {
-    const { date, time, court, player_text } = req.body
+    const { date, time, court, player_text, session_type } = req.body
     if (!date || !time || !court) return res.status(400).json({ error: 'Date, time, and court are required' })
     if (db.find('slots', s => s.date === date && s.time === time && s.court === court)) return res.status(409).json({ error: 'Slot already exists' })
-    const slot = db.insert('slots', { date, time, court, player_text: player_text || '', booking_id: null })
+    const status = player_text?.trim() ? 'confirmed' : 'available'
+    const slot = db.insert('slots', { date, time, court, player_text: player_text || '', session_type: session_type || null, status, booking_id: null })
     res.status(201).json(slot)
   } catch (err) {
     console.error('Create slot error:', err)

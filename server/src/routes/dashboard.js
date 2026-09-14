@@ -10,7 +10,7 @@ router.use(requireRole('superadmin', 'admin'))
 router.get('/', (req, res) => {
   try {
     const totalUsers = db.count('users')
-    const totalPlayers = db.count('players')
+    const totalPlayers = db.count('users', u => u.role === 'player')
     const totalResults = db.count('results')
     const totalBookings = db.count('bookings')
     const activeBookings = db.count('bookings', b => b.status === 'confirmed')
@@ -27,24 +27,36 @@ router.get('/', (req, res) => {
     })
     const usersByRole = ['superadmin', 'admin', 'coach', 'player'].map(role => ({ role, count: db.count('users', u => u.role === role) }))
 
-    const confirmedBookings = db.findAll('bookings', b => b.status === 'confirmed')
-    const userCredits = {}
-    for (const b of confirmedBookings) {
-      if (!b.user_id) continue
-      const u = db.get('users', b.user_id)
-      const name = u ? u.name : b.player_name || 'Unknown'
-      if (!userCredits[b.user_id]) {
-        userCredits[b.user_id] = { user_id: b.user_id, name, private_remaining: 0, group_remaining: 0, bookings: [] }
-      }
-      userCredits[b.user_id].private_remaining += b.private_remaining || 0
-      userCredits[b.user_id].group_remaining += b.group_remaining || 0
-      userCredits[b.user_id].bookings.push({ ref: b.ref, private_remaining: b.private_remaining || 0, group_remaining: b.group_remaining || 0 })
+    const sessionCredits = db.findAll('users', u => (u.private_balance || 0) > 0 || (u.group_balance || 0) > 0).map(u => ({
+      user_id: u.id, name: u.name,
+      private_balance: u.private_balance || 0,
+      group_balance: u.group_balance || 0,
+    }))
+
+    const upcomingSlots = db.findAll('slots')
+      .filter(s => s.date >= new Date().toISOString().slice(0, 10))
+      .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time) || a.court - b.court)
+      .slice(0, 20)
+      .map(s => ({
+        id: s.id, date: s.date, time: s.time, court: s.court,
+        player_text: s.player_text || '', session_type: s.session_type || '',
+      }))
+
+    const slotsByDate = {}
+    for (const s of db.findAll('slots')) {
+      if (!slotsByDate[s.date]) slotsByDate[s.date] = { total: 0, occupied: 0 }
+      slotsByDate[s.date].total++
+      if (s.player_text && s.player_text.trim()) slotsByDate[s.date].occupied++
     }
-    const sessionCredits = Object.values(userCredits).filter(c => c.private_remaining > 0 || c.group_remaining > 0)
 
     res.json({
-      stats: { totalUsers, totalPlayers, totalResults, totalBookings, activeBookings, totalRevenue, occupancyRate: totalSlots > 0 ? Math.round((occupiedSlots / totalSlots) * 100) : 0 },
-      recentBookings, recentImports, usersByRole, sessionCredits
+      stats: {
+        totalUsers, totalPlayers, totalResults, totalBookings, activeBookings, totalRevenue,
+        totalSlots, occupiedSlots,
+        occupancyRate: totalSlots > 0 ? Math.round((occupiedSlots / totalSlots) * 100) : 0,
+      },
+      recentBookings, recentImports, usersByRole, sessionCredits,
+      upcomingSlots, slotsByDate,
     })
   } catch (err) {
     console.error('Dashboard error:', err)

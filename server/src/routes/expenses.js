@@ -3,7 +3,7 @@ import db from '../database.js'
 import { authenticate } from '../middleware/auth.js'
 import { requireRole } from '../middleware/rbac.js'
 
-const CATEGORIES = ['Court Maintenance', 'Equipment', 'Salaries', 'Utilities', 'Other']
+const CATEGORIES = ['Court Booking Fees', 'Equipment', 'Salaries', 'Utilities', 'Other']
 const router = Router()
 router.use(authenticate)
 router.use(requireRole('superadmin', 'admin'))

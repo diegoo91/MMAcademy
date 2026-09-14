@@ -3,23 +3,13 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 const ThemeContext = createContext()
 
 const THEMES = [
-  { id: 'dark', label: 'Midnight', accent: 'lime' },
-  { id: 'light', label: 'Daylight', accent: 'lime' },
-  { id: 'ocean', label: 'Ocean', accent: 'cyan' },
-  { id: 'forest', label: 'Forest', accent: 'emerald' },
-  { id: 'sunset', label: 'Sunset', accent: 'orange' },
-  { id: 'royal', label: 'Royal', accent: 'purple' },
-  { id: 'contrast', label: 'High Contrast', accent: 'yellow' },
+  { id: 'dark', label: 'Dark', accent: 'lime' },
+  { id: 'light', label: 'Light', accent: 'lime' },
 ]
 
 const THEME_CLASSES = {
   dark: '',
   light: 'theme-light',
-  ocean: 'theme-ocean',
-  forest: 'theme-forest',
-  sunset: 'theme-sunset',
-  royal: 'theme-royal',
-  contrast: 'theme-contrast',
 }
 
 function isDarkTheme(theme) {
@@ -37,13 +27,14 @@ export function ThemeProvider({ children }) {
     const targets = [document.documentElement, document.body]
     for (const el of targets) {
       if (!el) continue
-      el.classList.remove('dark', 'theme-light', 'theme-ocean', 'theme-forest', 'theme-sunset', 'theme-royal', 'theme-contrast')
+      el.classList.remove('dark', 'theme-light')
       if (isDarkTheme(t)) {
         el.classList.add('dark')
       }
       const cls = THEME_CLASSES[t]
       if (cls) el.classList.add(cls)
     }
+    document.documentElement.setAttribute('data-theme', isDarkTheme(t) ? 'dark' : 'light')
   }, [])
 
   const setTheme = useCallback((t) => {
