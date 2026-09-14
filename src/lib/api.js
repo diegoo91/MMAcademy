@@ -46,7 +46,7 @@ async function request(method, path, body, opts = {}) {
   const res = await fetch(url, config)
   const data = await res.json().catch(() => null)
 
-  if (res.status === 401 && !opts.isRetry) {
+  if (res.status === 401 && !opts.isRetry && !opts.noRefresh) {
     const refreshed = await refreshAccessToken()
     if (refreshed) return request(method, path, body, { ...opts, isRetry: true })
     clearToken()
@@ -82,13 +82,13 @@ export const api = {
 }
 
 export async function login(email, password) {
-  const data = await request('POST', '/auth/login', { email, password })
+  const data = await request('POST', '/auth/login', { email, password }, { noRefresh: true })
   setToken(data.accessToken)
   return data.user
 }
 
 export async function signup(userData) {
-  const data = await request('POST', '/auth/signup', userData)
+  const data = await request('POST', '/auth/signup', userData, { noRefresh: true })
   setToken(data.accessToken)
   return data.user
 }

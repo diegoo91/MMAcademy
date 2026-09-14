@@ -24,6 +24,7 @@ dist-ssr
 *.sw?
 
 # Server secrets and data
+.env
 server/.env
 server/academy.db.json
 server/uploads/
