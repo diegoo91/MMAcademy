@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Camera, Clock, Mail, Phone, Shield, ArrowRightLeft, Calendar, Trophy, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
+import { Camera, Clock, Mail, Phone, Shield, ArrowRightLeft, Calendar, Trophy, AlertTriangle, CheckCircle, XCircle, Key } from 'lucide-react'
 import { api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 
@@ -17,6 +17,10 @@ export default function Profile() {
   const [pendingResultsCount, setPendingResultsCount] = useState(0)
   const [mySlots, setMySlots] = useState([])
   const [slotsLoading, setSlotsLoading] = useState(false)
+  const [showPasswordChange, setShowPasswordChange] = useState(false)
+  const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwMsg, setPwMsg] = useState('')
 
   const fetchMySlots = () => {
     if (!user) return
@@ -95,6 +99,35 @@ export default function Profile() {
       const data = await api.upload('/auth/avatar', fd)
       setUser({ ...user, avatar: data.avatar })
     } catch {}
+  }
+
+  const handlePasswordChange = async () => {
+    setPwSaving(true)
+    setPwMsg('')
+    try {
+      if (!pwForm.currentPassword || !pwForm.newPassword) {
+        setPwMsg('Both fields are required')
+        setPwSaving(false)
+        return
+      }
+      if (pwForm.newPassword.length < 8) {
+        setPwMsg('New password must be at least 8 characters')
+        setPwSaving(false)
+        return
+      }
+      if (pwForm.newPassword !== pwForm.confirmPassword) {
+        setPwMsg('Passwords do not match')
+        setPwSaving(false)
+        return
+      }
+      await api.post('/auth/change-password', { currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword })
+      setPwMsg('Password changed successfully!')
+      setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      setShowPasswordChange(false)
+    } catch (err) {
+      setPwMsg(err.message || 'Failed to change password')
+    }
+    setPwSaving(false)
   }
 
   const confirmedCount = bookings.filter(b => b.status === 'player_confirmed').length
@@ -196,6 +229,45 @@ export default function Profile() {
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
+          )}
+        </div>
+
+        {/* Change Password */}
+        <div className="glass-panel rounded-3xl border border-theme p-6 sm:p-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-heading text-xl font-extrabold text-theme flex items-center gap-2">
+              <Key className="w-5 h-5 text-amber-400" /> Change Password
+            </h2>
+            {!showPasswordChange && (
+              <button onClick={() => { setShowPasswordChange(true); setPwMsg('') }} className="px-4 py-2 rounded-xl bg-surface border border-theme text-theme text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-800 transition-all">
+                Change
+              </button>
+            )}
+          </div>
+          {showPasswordChange ? (
+            <div className="space-y-4 max-w-sm">
+              <div>
+                <label className="block text-xs font-semibold text-theme uppercase tracking-wider mb-1.5">Current Password</label>
+                <input type="password" value={pwForm.currentPassword} onChange={e => setPwForm({ ...pwForm, currentPassword: e.target.value })} className="w-full px-4 py-2.5 rounded-xl bg-surface border border-theme text-theme text-sm focus:outline-none focus:border-lime-400" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-theme uppercase tracking-wider mb-1.5">New Password (min 8 characters)</label>
+                <input type="password" value={pwForm.newPassword} onChange={e => setPwForm({ ...pwForm, newPassword: e.target.value })} minLength={8} className="w-full px-4 py-2.5 rounded-xl bg-surface border border-theme text-theme text-sm focus:outline-none focus:border-lime-400" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-theme uppercase tracking-wider mb-1.5">Confirm New Password</label>
+                <input type="password" value={pwForm.confirmPassword} onChange={e => setPwForm({ ...pwForm, confirmPassword: e.target.value })} minLength={8} className="w-full px-4 py-2.5 rounded-xl bg-surface border border-theme text-theme text-sm focus:outline-none focus:border-lime-400" />
+              </div>
+              {pwMsg && <p className={`text-xs ${pwMsg.includes('success') ? 'text-emerald-400' : 'text-rose-400'}`}>{pwMsg}</p>}
+              <div className="flex gap-2">
+                <button onClick={() => { setShowPasswordChange(false); setPwMsg('') }} className="flex-1 py-2.5 rounded-xl bg-surface border border-theme text-theme text-sm font-semibold">Cancel</button>
+                <button onClick={handlePasswordChange} disabled={pwSaving} className="flex-1 py-2.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-bold text-sm transition-all disabled:opacity-50">
+                  {pwSaving ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            pwMsg && <p className={`text-xs ${pwMsg.includes('success') ? 'text-emerald-400' : 'text-rose-400'}`}>{pwMsg}</p>
           )}
         </div>
 

@@ -2,6 +2,7 @@ import { Router } from 'express'
 import db from '../database.js'
 import { authenticate } from '../middleware/auth.js'
 import { requireRole } from '../middleware/rbac.js'
+import { auditUpdate } from '../middleware/audit.js'
 
 const router = Router()
 router.use(authenticate)
@@ -204,6 +205,7 @@ router.put('/:id/decide', requireRole('superadmin', 'admin'), (req, res) => {
       decided_at: new Date().toISOString(),
       payload: { ...request.payload, proposed_date, proposed_time, proposed_court },
     })
+    auditUpdate(req, 'booking_request', id, { status: request.status }, { status: decision, kind: request.kind, slot_id: request.slot_id })
     res.json(updated)
   } catch (err) {
     console.error('Decide request error:', err)

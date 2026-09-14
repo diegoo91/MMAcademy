@@ -6,14 +6,19 @@ import { nanoid } from 'nanoid'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DB_PATH = join(__dirname, '..', 'academy.db.json')
 
-let data = { users: [], results: [], slots: [], bookings: [], import_batches: [], comments: [], notifications: [], conversion_requests: [], expenses: [], booking_requests: [], payments: [] }
+// NOTE: This JSON-file database does NOT persist across Railway redeploys on the free tier.
+// The file lives on an ephemeral container filesystem — data resets to seed state on each deploy.
+// This setup is for testing/demo only. Production data would require either Railway's paid
+// persistent volumes or migrating to a real database (Postgres, SQLite on volume, etc.).
+
+let data = { users: [], results: [], slots: [], bookings: [], import_batches: [], comments: [], notifications: [], conversion_requests: [], expenses: [], booking_requests: [], payments: [], audit_logs: [] }
 
 if (existsSync(DB_PATH)) {
   try { data = JSON.parse(readFileSync(DB_PATH, 'utf-8')) } catch { /* start fresh */ }
 }
 
 // Ensure all expected collections exist (handles adding new collections)
-const DEFAULTS = { users: [], results: [], slots: [], bookings: [], import_batches: [], comments: [], notifications: [], conversion_requests: [], expenses: [], booking_requests: [], payments: [] }
+const DEFAULTS = { users: [], results: [], slots: [], bookings: [], import_batches: [], comments: [], notifications: [], conversion_requests: [], expenses: [], booking_requests: [], payments: [], audit_logs: [] }
 for (const [key, val] of Object.entries(DEFAULTS)) {
   if (!Array.isArray(data[key])) data[key] = val
 }

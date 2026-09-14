@@ -375,6 +375,7 @@ export default function Players() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-muted text-xs uppercase border-b border-theme">
+                  <th className="text-left px-6 py-4 font-semibold">Code</th>
                   <th className="text-left px-6 py-4 font-semibold">Name</th>
                   <th className="text-left px-6 py-4 font-semibold">Email</th>
                   <th className="text-left px-6 py-4 font-semibold">Phone</th>
@@ -390,6 +391,9 @@ export default function Players() {
               <tbody className="divide-y divide-theme">
                 {players.map(p => (
                   <tr key={p.id} className="hover:bg-white/50 dark:hover:bg-slate-900/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <span className="font-mono text-xs font-bold text-lime-400">{p.member_code || '—'}</span>
+                    </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-lime-400/20 text-lime-400 flex items-center justify-center font-bold text-xs">{p.full_name.charAt(0)}</div>

@@ -2,6 +2,8 @@ import { Router } from 'express'
 import db from '../database.js'
 import { authenticate, optionalAuth } from '../middleware/auth.js'
 import { requireRole } from '../middleware/rbac.js'
+import { validateLength, LIMITS } from '../middleware/validation.js'
+import { auditUpdate } from '../middleware/audit.js'
 
 const router = Router()
 
@@ -95,11 +97,9 @@ function reverseBalanceCredit(userId, sessionType) {
   const user = db.get('users', userId)
   if (!user) return
   if (sessionType === 'private') {
-    const newPriv = Math.max(0, (user.private_balance || 0) - 1)
-    db.update('users', userId, { private_balance: newPriv })
+    db.update('users', userId, { private_balance: (user.private_balance || 0) - 1 })
   } else if (sessionType === 'group') {
-    const newGrp = Math.max(0, (user.group_balance || 0) - 1)
-    db.update('users', userId, { group_balance: newGrp })
+    db.update('users', userId, { group_balance: (user.group_balance || 0) - 1 })
   }
 }
 
@@ -110,6 +110,8 @@ router.put('/:id', requireRole('superadmin', 'admin'), (req, res) => {
     const slot = db.get('slots', id)
     if (!slot) return res.status(404).json({ error: 'Slot not found' })
     const { player_text, date, time, court, session_type, status } = req.body
+    const err = validateLength('Player', player_text, LIMITS.playerText)
+    if (err) return res.status(400).json({ error: err })
     const newDate = date || slot.date
     const newTime = time || slot.time
     const newCourt = court || slot.court
@@ -160,6 +162,8 @@ router.post('/', requireRole('superadmin', 'admin'), (req, res) => {
   try {
     const { date, time, court, player_text, session_type } = req.body
     if (!date || !time || !court) return res.status(400).json({ error: 'Date, time, and court are required' })
+    const err = validateLength('Player', player_text, LIMITS.playerText)
+    if (err) return res.status(400).json({ error: err })
     if (db.find('slots', s => s.date === date && s.time === time && s.court === court)) return res.status(409).json({ error: 'Slot already exists' })
 
     const hasPlayer = player_text?.trim()
@@ -263,6 +267,7 @@ router.put('/:id/confirm', (req, res) => {
     }
 
     const updated = db.update('slots', slot.id, { status: STATUS.PLAYER_CONFIRMED })
+    auditUpdate(req, 'slot', slot.id, { status: slot.status }, { status: STATUS.PLAYER_CONFIRMED })
 
     if (userId) {
       notifyUser(userId, 'player_confirmed', 'Attendance Confirmed',
@@ -366,6 +371,7 @@ router.put('/day/:date/approve', requireRole('superadmin', 'admin'), (req, res) 
           '/profile')
       }
     }
+    auditUpdate(req, 'slots', null, { date, count: slots.length }, { date, action: 'day_approve', count })
 
     res.json({ approved: count })
   } catch (err) {
@@ -393,6 +399,7 @@ router.put('/day/:date/undo', requireRole('superadmin', 'admin'), (req, res) => 
           '/schedule')
       }
     }
+    auditUpdate(req, 'slots', null, { date, count: slots.length }, { date, action: 'day_undo', count })
 
     res.json({ reverted: count })
   } catch (err) {

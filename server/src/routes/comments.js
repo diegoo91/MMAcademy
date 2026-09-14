@@ -2,6 +2,7 @@ import { Router } from 'express'
 import db from '../database.js'
 import { authenticate } from '../middleware/auth.js'
 import { requireRole } from '../middleware/rbac.js'
+import { validateLength, LIMITS } from '../middleware/validation.js'
 
 const router = Router()
 
@@ -22,6 +23,8 @@ router.post('/', authenticate, (req, res) => {
   try {
     const { text, rating } = req.body
     if (!text || !text.trim()) return res.status(400).json({ error: 'Comment text is required' })
+    const err = validateLength('Comment', text, LIMITS.commentText)
+    if (err) return res.status(400).json({ error: err })
     const comment = db.insert('comments', {
       user_id: req.user.id,
       user_name: req.user.name,

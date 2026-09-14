@@ -2,6 +2,7 @@ import { Router } from 'express'
 import db from '../database.js'
 import { authenticate } from '../middleware/auth.js'
 import { requireRole } from '../middleware/rbac.js'
+import { auditUpdate, auditDelete } from '../middleware/audit.js'
 
 const router = Router()
 router.use(authenticate)
@@ -102,6 +103,7 @@ router.put('/:id/approve', (req, res) => {
     }
 
     const updated = db.update('payments', payment.id, { status: STATUS.PAYMENT_APPROVED })
+    auditUpdate(req, 'payment', payment.id, { status: payment.status }, { status: STATUS.PAYMENT_APPROVED, ref: payment.ref })
 
     // Move linked booking + slots to payment_approved
     if (payment.booking_id) {
@@ -144,6 +146,7 @@ router.put('/:id/reject', (req, res) => {
     if (payment.status !== STATUS.PAYMENT_PENDING) return res.status(400).json({ error: 'Payment is not pending' })
 
     const updated = db.update('payments', payment.id, { status: STATUS.PAYMENT_REJECTED })
+    auditUpdate(req, 'payment', payment.id, { status: payment.status }, { status: STATUS.PAYMENT_REJECTED, ref: payment.ref })
 
     if (payment.booking_id) {
       const booking = db.get('bookings', payment.booking_id)
@@ -171,6 +174,8 @@ router.put('/:id/reject', (req, res) => {
 router.delete('/:id', (req, res) => {
   const payment = db.get('payments', parseInt(req.params.id))
   if (!payment) return res.status(404).json({ error: 'Payment not found' })
+
+  auditDelete(req, 'payment', payment.id, { ref: payment.ref, status: payment.status, player_id: payment.player_id })
 
   // Reverse balance credits if payment was approved
   if (payment.status === STATUS.PAYMENT_APPROVED && payment.player_id) {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { AlertCircle, CheckCircle2, Edit, Key, Plus, Search, Shield, Trash2, X, ArrowRightLeft } from 'lucide-react'
-import { api } from '../../lib/api'
+import { AlertCircle, CheckCircle2, Download, Edit, Key, Plus, Search, Shield, Trash2, X, ArrowRightLeft } from 'lucide-react'
+import { api, downloadFile } from '../../lib/api'
 
 function ConvertModal({ user, onClose, onDone }) {
   const [from, setFrom] = useState('private')
@@ -256,7 +256,7 @@ export default function Users() {
   const filteredUsers = users.filter(u => {
     if (!search) return true
     const q = search.toLowerCase()
-    return (u.name || '').toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.phone && u.phone.includes(q))
+    return (u.name || '').toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.phone && u.phone.includes(q)) || (u.member_code && u.member_code.includes(q))
   })
 
   const handleDelete = async (id) => {
@@ -278,9 +278,14 @@ export default function Users() {
           <h1 className="font-heading text-3xl font-black text-theme">Users</h1>
           <p className="text-muted text-sm mt-1">{filteredUsers.length} of {users.length} users</p>
         </div>
-        <button onClick={() => setShowAdd(true)} className="px-4 py-2.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 text-sm font-bold flex items-center gap-2">
-          <Plus className="w-4 h-4" /> Create User
-        </button>
+        <div className="flex gap-2">
+          <button onClick={async () => { try { const blob = await downloadFile('/users/export-credentials'); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'mm-padel-credentials.xlsx'; a.click(); URL.revokeObjectURL(url) } catch (err) { alert(err.message || 'Export failed') } }} className="px-4 py-2.5 rounded-xl bg-surface border border-theme text-theme text-sm font-semibold flex items-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-800">
+            <Download className="w-4 h-4" /> Export Credentials
+          </button>
+          <button onClick={() => setShowAdd(true)} className="px-4 py-2.5 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 text-sm font-bold flex items-center gap-2">
+            <Plus className="w-4 h-4" /> Create User
+          </button>
+        </div>
       </div>
 
       <div className="relative max-w-sm">
@@ -307,6 +312,7 @@ export default function Users() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-muted text-xs uppercase border-b border-theme">
+                  <th className="text-left px-6 py-4 font-semibold">Code</th>
                   <th className="text-left px-6 py-4 font-semibold">User</th>
                   <th className="text-left px-6 py-4 font-semibold">Email</th>
                   <th className="text-left px-6 py-4 font-semibold">Role</th>
@@ -320,12 +326,15 @@ export default function Users() {
               <tbody className="divide-y divide-theme">
                 {filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-muted text-sm">
+                    <td colSpan={9} className="px-6 py-12 text-center text-muted text-sm">
                       {search ? 'No users match your search.' : 'No users found.'}
                     </td>
                   </tr>
                 ) : filteredUsers.map(u => (
                   <tr key={u.id} className="hover:bg-white/50 dark:hover:bg-slate-900/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <span className="font-mono text-xs font-bold text-lime-400">{u.member_code || '—'}</span>
+                    </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-lime-400/20 text-lime-400 flex items-center justify-center font-bold text-xs">{u.name?.charAt(0)}</div>

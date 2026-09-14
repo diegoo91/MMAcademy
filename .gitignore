@@ -27,3 +27,6 @@ dist-ssr
 server/.env
 server/academy.db.json
 server/uploads/
+
+# Spreadsheet files (may contain credentials)
+*.xlsx

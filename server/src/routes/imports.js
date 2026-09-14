@@ -3,13 +3,32 @@ import multer from 'multer'
 import XLSX from 'xlsx'
 import ExcelJS from 'exceljs'
 import { fileURLToPath } from 'url'
-import { dirname, join } from 'path'
+import { dirname, join, extname } from 'path'
+import { randomBytes } from 'crypto'
 import db from '../database.js'
 import { authenticate } from '../middleware/auth.js'
 import { requireRole } from '../middleware/rbac.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const upload = multer({ dest: join(__dirname, '..', '..', 'uploads'), limits: { fileSize: 10 * 1024 * 1024 } })
+
+// Accept only spreadsheet types by extension
+function isSpreadsheet(file) {
+  const ext = (file.originalname || '').split('.').pop().toLowerCase()
+  return ['xlsx', 'xls', 'csv'].includes(ext)
+}
+
+const storage = multer.diskStorage({
+  destination: join(__dirname, '..', '..', 'uploads'),
+  filename: (req, file, cb) => cb(null, `import_${randomBytes(8).toString('hex')}${extname(file.originalname)}`),
+})
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (isSpreadsheet(file)) cb(null, true)
+    else cb(new Error('Only .xlsx, .xls, and .csv files are allowed'))
+  },
+})
 
 const router = Router()
 router.use(authenticate)

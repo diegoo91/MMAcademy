@@ -7,7 +7,8 @@ import db from './database.js'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@mmpadel.com'
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin123!'
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD
+if (!ADMIN_PASSWORD) throw new Error('ADMIN_PASSWORD env var is required')
 const ADMIN_NAME = process.env.ADMIN_NAME || 'Super Admin'
 
 const existing = db.find('users', u => u.email === ADMIN_EMAIL)
@@ -23,7 +24,7 @@ if (existing) {
     password_hash: hash, role: 'superadmin', skill_level: 'Intermediate',
     member_since: new Date().getFullYear().toString(), force_password_change: 1
   })
-  console.log(`Admin seeded: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD} (id=${user.id})`)
+  console.log(`Admin seeded: ${ADMIN_EMAIL} (id=${user.id})`) // never log passwords
 }
 
 const MONTH_MAP = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' }

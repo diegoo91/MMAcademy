@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:5174/api'
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5174/api'
 
 let accessToken = null
 

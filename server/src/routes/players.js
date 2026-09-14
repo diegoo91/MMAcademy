@@ -6,6 +6,12 @@ import { requireRole } from '../middleware/rbac.js'
 const router = Router()
 router.use(authenticate)
 
+function nextMemberCode() {
+  const existing = db.findAll('users').map(u => parseInt(u.member_code)).filter(n => !isNaN(n))
+  const max = existing.length > 0 ? Math.max(...existing) : 0
+  return String(max + 1).padStart(3, '0')
+}
+
 router.get('/', (req, res) => {
   try {
     const { search, skill, page = 1, limit = 50 } = req.query
@@ -13,7 +19,7 @@ router.get('/', (req, res) => {
     const allSlots = db.findAll('slots')
     if (search) {
       const q = search.toLowerCase()
-      filtered = filtered.filter(p => (p.name || '').toLowerCase().includes(q) || p.email.toLowerCase().includes(q) || (p.phone && p.phone.includes(q)))
+      filtered = filtered.filter(p => (p.name || '').toLowerCase().includes(q) || p.email.toLowerCase().includes(q) || (p.phone && p.phone.includes(q)) || (p.member_code && p.member_code.includes(q)))
     }
     if (skill) filtered = filtered.filter(p => p.skill_level === skill)
     filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
@@ -41,7 +47,7 @@ router.get('/', (req, res) => {
       }
       const total_private = (p.private_balance || 0) + used_private
       const total_group = (p.group_balance || 0) + used_group
-      return { id: p.id, full_name: p.name, email: p.email, phone: p.phone, dob: p.dob, skill_level: p.skill_level, position: p.position || '', notes: p.notes || '', private_balance: p.private_balance || 0, group_balance: p.group_balance || 0, balance_zero_since: p.balance_zero_since || null, remaining_sessions, used_private, used_group, total_private, total_group, created_at: p.created_at, updated_at: p.updated_at }
+      return { id: p.id, full_name: p.name, email: p.email, phone: p.phone, dob: p.dob, skill_level: p.skill_level, position: p.position || '', notes: p.notes || '', private_balance: p.private_balance || 0, group_balance: p.group_balance || 0, balance_zero_since: p.balance_zero_since || null, remaining_sessions, used_private, used_group, total_private, total_group, created_at: p.created_at, updated_at: p.updated_at, member_code: p.member_code || '' }
     })
     res.json({ players, total, page: parseInt(page), limit: parseInt(limit) })
   } catch (err) {
@@ -100,6 +106,7 @@ router.post('/', requireRole('superadmin', 'admin'), (req, res) => {
       skill_level: skill_level || 'Intermediate', notes: notes || '',
       private_balance: 0, group_balance: 0,
       member_since: new Date().getFullYear().toString(), force_password_change: 1,
+      member_code: nextMemberCode(),
     })
     const { password_hash, ...safe } = user
     res.status(201).json({ ...safe, full_name: safe.name })
