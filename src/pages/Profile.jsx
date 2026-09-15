@@ -321,7 +321,7 @@ export default function Profile() {
           {loading ? (
             <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-lime-400 border-t-transparent rounded-full animate-spin" /></div>
           ) : visibleBookings.length === 0 ? (
-            <p className="text-muted text-sm text-center py-8">No bookings yet. <a href="/book" className="text-lime-400 font-bold hover:underline">Book a session</a></p>
+            <p className="text-muted text-sm text-center py-8">No bookings yet. <Link to="/book" className="text-lime-400 font-bold hover:underline">Book a session</Link></p>
           ) : (
             <div className="space-y-3">
               {visibleBookings.map(b => {

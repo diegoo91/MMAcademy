@@ -56,8 +56,6 @@ export default function Book() {
   const [weekDays, setWeekDays] = useState([])
   const [weekTime, setWeekTime] = useState('')
   const [weekWeeks, setWeekWeeks] = useState(1)
-  const [balanceCheck, setBalanceCheck] = useState(null)
-  const [bookingFromBalance, setBookingFromBalance] = useState(false)
 
   const fetchSlots = () => {
     setLoadingSlots(true)
@@ -82,13 +80,6 @@ export default function Book() {
   }
 
   useEffect(() => { fetchSlots() }, [])
-
-  useEffect(() => {
-    if (!user || !sessionType || sessionCount === 0) { setBalanceCheck(null); return }
-    api.get(`/slots/balance-check?sessionType=${sessionType}&count=${sessionCount}`)
-      .then(setBalanceCheck)
-      .catch(() => setBalanceCheck(null))
-  }, [user, sessionType, sessionCount])
 
   const isTimeBooked = (date, time, court) => bookedMap.has(`${date}|${time}|${court}`)
 
@@ -150,18 +141,6 @@ export default function Book() {
     navigate('/payment', {
       state: { sessionType, mode, sessions: activeSessions, totalPrice, sessionCount },
     })
-  }
-
-  const handleBookFromBalance = async () => {
-    if (!user) { navigate('/login'); return }
-    setBookingFromBalance(true)
-    try {
-      await api.post('/bookings/from-balance', { sessionType, sessions: activeSessions })
-      navigate('/profile')
-    } catch (err) {
-      alert(err.message || 'Failed to book from balance')
-    }
-    setBookingFromBalance(false)
   }
 
   return (
@@ -383,27 +362,15 @@ export default function Book() {
                     </div>
                   </div>
 
-                  {balanceCheck?.hasEnough ? (
-                    <button onClick={handleBookFromBalance} disabled={bookingFromBalance} className="w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-white font-extrabold text-sm shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50">
-                      {bookingFromBalance ? 'Booking...' : `Book from Balance (${sessionCount} session${sessionCount === 1 ? '' : 's'})`}
-                    </button>
-                  ) : (
-                    <button onClick={handleContinue} disabled={!canContinue} className="w-full py-4 rounded-2xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-extrabold text-sm shadow-xl shadow-lime-400/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50">
-                      <span>{user ? `Continue to Payment (${totalPrice.toLocaleString()} EGP)` : 'Login to Continue'}</span>
-                      <ArrowRight className="w-5 h-5" />
-                    </button>
-                  )}
+                  <button onClick={handleContinue} disabled={!canContinue} className="w-full py-4 rounded-2xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-extrabold text-sm shadow-xl shadow-lime-400/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50">
+                    <span>{user ? `Continue to Payment (${totalPrice.toLocaleString()} EGP)` : 'Login to Continue'}</span>
+                    <ArrowRight className="w-5 h-5" />
+                  </button>
 
-                  {balanceCheck?.hasEnough ? (
-                    <p className="text-[11px] text-emerald-400 text-center font-bold">
-                      You have enough balance — no payment needed!
-                    </p>
-                  ) : (
-                    <p className="text-[11px] text-muted text-center flex items-center justify-center gap-1">
-                      <Info className="w-3.5 h-3.5" />
-                      <span>Passes directly to InstaPay Checkout</span>
-                    </p>
-                  )}
+                  <p className="text-[11px] text-muted text-center flex items-center justify-center gap-1">
+                    <Info className="w-3.5 h-3.5" />
+                    <span>Passes directly to InstaPay Checkout</span>
+                  </p>
                 </>
               )}
             </div>

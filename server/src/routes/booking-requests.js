@@ -137,7 +137,12 @@ router.put('/:id/decide', requireRole('superadmin', 'admin'), (req, res) => {
               if (sessionType === 'private') {
                 updateUserBalance(user.id, (user.private_balance || 0) - 1, user.group_balance || 0)
               } else {
-                updateUserBalance(user.id, user.private_balance || 0, (user.group_balance || 0) - 1)
+                const grp = user.group_balance || 0
+                if (grp > 0) {
+                  updateUserBalance(user.id, user.private_balance || 0, grp - 1)
+                } else {
+                  updateUserBalance(user.id, (user.private_balance || 0) + 1, 0)
+                }
               }
             }
           }

@@ -153,7 +153,13 @@ function reverseBalanceCredit(userId, sessionType) {
   if (sessionType === 'private') {
     db.update('users', userId, { private_balance: (user.private_balance || 0) - 1 })
   } else if (sessionType === 'group') {
-    db.update('users', userId, { group_balance: (user.group_balance || 0) - 1 })
+    const grp = user.group_balance || 0
+    if (grp > 0) {
+      db.update('users', userId, { group_balance: grp - 1 })
+    } else {
+      // Group was converted from private on deduct, so reverse by converting back
+      db.update('users', userId, { group_balance: 0, private_balance: (user.private_balance || 0) + 1 })
+    }
   }
 }
 
