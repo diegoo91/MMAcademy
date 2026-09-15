@@ -21,7 +21,7 @@ if (existsSync(DB_PATH)) {
 }
 
 // Ensure all expected collections exist (handles adding new collections)
-const DEFAULTS = { users: [], results: [], slots: [], bookings: [], import_batches: [], comments: [], notifications: [], conversion_requests: [], expenses: [], booking_requests: [], payments: [], audit_logs: [] }
+const DEFAULTS = { users: [], results: [], slots: [], bookings: [], import_batches: [], comments: [], notifications: [], conversion_requests: [], expenses: [], booking_requests: [], payments: [], audit_logs: [], court_defaults: [] }
 for (const [key, val] of Object.entries(DEFAULTS)) {
   if (!Array.isArray(data[key])) data[key] = val
 }

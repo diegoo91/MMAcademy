@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Calendar as CalendarIcon, DollarSign, Download, TrendingUp, Trophy, Users } from 'lucide-react'
 import { api } from '../../lib/api'
+import { useAuth } from '../../context/AuthContext'
 
 function downloadCSV(filename, headers, rows) {
   const escape = (v) => {
@@ -53,11 +54,13 @@ function DateRangeSelector({ preset, setPreset, from, setFrom, to, setTo }) {
 }
 
 export default function Reports() {
+  const { isSuperAdmin } = useAuth()
   const [preset, setPreset] = useState('month')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [coachHours, setCoachHours] = useState(null)
 
   const fetchReport = () => {
     setLoading(true)
@@ -70,7 +73,17 @@ export default function Reports() {
     api.get(`/reports/summary?${params}`).then(setData).catch(() => {}).finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetchReport() }, [preset, from, to])
+  useEffect(() => { fetchReport(); if (isSuperAdmin) fetchCoachHours() }, [preset, from, to])
+
+  const fetchCoachHours = () => {
+    const params = new URLSearchParams()
+    params.set('preset', preset)
+    if (preset === 'custom') {
+      if (from) params.set('from', from)
+      if (to) params.set('to', to)
+    }
+    api.get(`/reports/coach-hours?${params}`).then(setCoachHours).catch(() => {})
+  }
 
   return (
     <div className="space-y-6">
@@ -276,6 +289,37 @@ export default function Reports() {
               </div>
             )}
           </div>
+
+          {isSuperAdmin && coachHours && (
+            <div className="glass-panel rounded-2xl p-6 border border-theme">
+              <h3 className="font-heading font-extrabold text-theme text-lg mb-4 flex items-center gap-2">
+                <Users className="w-5 h-5 text-lime-400" /> Coach Hours
+                <button onClick={() => {
+                  const range = preset === 'custom' ? `${from || 'start'}_to_${to || 'end'}` : preset
+                  downloadCSV(`coach_hours_${range}.csv`, ['Coach', 'Hours (Slots)'],
+                    (coachHours.coachHours || []).map(c => [c.name, c.hours])
+                  )
+                }} className="ml-auto px-2 py-1 rounded-lg text-[10px] font-bold text-muted hover:text-lime-400 hover:bg-lime-400/10 flex items-center gap-1">
+                  <Download className="w-3 h-3" /> CSV
+                </button>
+              </h3>
+              {(!coachHours.coachHours || coachHours.coachHours.length === 0) ? (
+                <p className="text-sm text-muted text-center py-4">No coach assignments in this period.</p>
+              ) : (
+                <div className="max-h-80 overflow-y-auto space-y-2">
+                  {coachHours.coachHours.map((c, i) => (
+                    <div key={i} className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-white/50 dark:bg-slate-900/50 border border-theme/50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-lime-400/20 text-lime-400 flex items-center justify-center font-bold text-xs">{c.name.charAt(0)}</div>
+                        <span className="font-semibold text-theme text-sm">{c.name}</span>
+                      </div>
+                      <span className="px-3 py-1 rounded-full bg-lime-400/10 text-lime-400 text-xs font-bold">{c.hours} hours</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>

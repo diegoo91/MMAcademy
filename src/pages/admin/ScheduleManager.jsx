@@ -45,7 +45,7 @@ export default function ScheduleManager() {
   const [loading, setLoading] = useState(true)
   const [editSlot, setEditSlot] = useState(null)
   const [addSlot, setAddSlot] = useState(null)
-  const [addForm, setAddForm] = useState({ date: '', time: '15:00', court: 1, player_text: '', session_type: null })
+  const [addForm, setAddForm] = useState({ date: '', time: '15:00', court: 1, player_text: '', session_type: null, coach_id: null })
   const [addPartner, setAddPartner] = useState('')
   const [selectedPlayer, setSelectedPlayer] = useState(null)
   const [conversionRequests, setConversionRequests] = useState([])
@@ -57,6 +57,8 @@ export default function ScheduleManager() {
   const [balanceWarning, setBalanceWarning] = useState(null)
   const [pendingOverride, setPendingOverride] = useState(null)
   const [dayActionLoading, setDayActionLoading] = useState(null)
+  const [coaches, setCoaches] = useState([])
+  const [courtDefaults, setCourtDefaults] = useState([])
 
   const fetchSlots = () => {
     setLoading(true)
@@ -76,7 +78,15 @@ export default function ScheduleManager() {
     api.get('/conversion-requests').then(setConversionRequests).catch(() => {}).finally(() => setConvLoading(false))
   }
 
-  useEffect(() => { fetchSlots(); fetchConversionRequests() }, [])
+  useEffect(() => { fetchSlots(); fetchConversionRequests(); fetchCoachesAndDefaults() }, [])
+
+  const fetchCoachesAndDefaults = () => {
+    api.get('/users').then(data => {
+      const coachList = (Array.isArray(data) ? data : data.users || []).filter(u => u.role === 'coach')
+      setCoaches(coachList)
+    }).catch(() => {})
+    api.get('/slots/court-defaults').then(setCourtDefaults).catch(() => {})
+  }
 
   const checkPlayerBalance = (player) => {
     if (!player || isSuperAdmin) return null
@@ -218,7 +228,7 @@ export default function ScheduleManager() {
       }
       await api.post('/slots', payload)
       setAddSlot(null)
-      setAddForm({ date: '', time: '15:00', court: 1, player_text: '', session_type: null })
+      setAddForm({ date: '', time: '15:00', court: 1, player_text: '', session_type: null, coach_id: null })
       setAddPartner('')
       setSelectedPlayer(null)
       fetchSlots()
@@ -251,7 +261,7 @@ export default function ScheduleManager() {
       await api.post('/slots', payload)
       setPendingOverride(null)
       setAddSlot(null)
-      setAddForm({ date: '', time: '15:00', court: 1, player_text: '', session_type: null })
+      setAddForm({ date: '', time: '15:00', court: 1, player_text: '', session_type: null, coach_id: null })
       setAddPartner('')
       setSelectedPlayer(null)
       fetchSlots()
@@ -434,6 +444,9 @@ export default function ScheduleManager() {
                                         {slot.session_type === 'group' ? 'GRP' : 'PVT'}
                                       </span>
                                     )}
+                                    {slot.coach_name && (
+                                      <span className="text-[8px] font-bold text-amber-400">{slot.coach_name}</span>
+                                    )}
                                     <span className="text-[8px] opacity-60">{STATUS_LABELS[slot.status]}</span>
                                   </div>
                                   {renderSlotActions(slot)}
@@ -462,8 +475,8 @@ export default function ScheduleManager() {
             </div>
           ) : (
             <div className="glass-panel rounded-3xl p-6 border border-theme overflow-x-auto">
-              <div className="min-w-[850px]">
-                <div className="grid grid-cols-6 gap-3 pb-4 border-b border-theme text-center font-heading text-sm font-extrabold text-theme">
+              <div className="min-w-[950px]">
+                <div className="grid grid-cols-8 gap-3 pb-4 border-b border-theme text-center font-heading text-sm font-extrabold text-theme">
                   <div className="text-left text-muted text-xs uppercase">Time</div>
                   {weekDates.map(d => (
                     <div key={d} className="text-lime-400 text-xs">{getDayName(d)} ({formatDateShort(d)})</div>
@@ -471,7 +484,7 @@ export default function ScheduleManager() {
                 </div>
                 <div className="divide-y divide-theme pt-2 space-y-2">
                   {weekTimes.map(time => (
-                    <div key={time} className="grid grid-cols-6 gap-3 py-2 items-center text-xs">
+                    <div key={time} className="grid grid-cols-8 gap-3 py-2 items-center text-xs">
                         <div className="font-bold text-theme font-mono flex items-center gap-1.5 text-[11px]">
                         <Clock className="w-3.5 h-3.5 text-lime-400" />
                         <span>{TIME_LABELS[time] || time}</span>
@@ -497,7 +510,13 @@ export default function ScheduleManager() {
                             {empty ? (
                               canEdit ? <button onClick={() => { setAddSlot(true); setAddForm({ ...addForm, date: d, time }) }} className="text-lime-400 hover:underline">+ Add</button> : 'Available'
                             ) : (
-                              <span className="block">{[s1 && `C1: ${s1.player_text}`, s2 && `C2: ${s2.player_text}`, s3 && `C3: ${s3.player_text}`].filter(Boolean).join(' / ')}</span>
+                              <>
+                                <span className="block">{[s1 && `C1: ${s1.player_text}`, s2 && `C2: ${s2.player_text}`, s3 && `C3: ${s3.player_text}`].filter(Boolean).join(' / ')}</span>
+                                {(() => {
+                                  const coachNames = [s1?.coach_name, s2?.coach_name, s3?.coach_name].filter(Boolean)
+                                  return coachNames.length > 0 ? <span className="block text-[9px] text-amber-400 mt-0.5">{coachNames.join(', ')}</span> : null
+                                })()}
+                              </>
                             )}
                           </div>
                         )
@@ -628,7 +647,11 @@ export default function ScheduleManager() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-theme uppercase mb-1">Court</label>
-                <select value={addForm.court} onChange={e => setAddForm({ ...addForm, court: parseInt(e.target.value) })} className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs">
+                <select value={addForm.court} onChange={e => {
+                  const court = parseInt(e.target.value)
+                  const def = courtDefaults.find(cd => cd.court === court)
+                  setAddForm({ ...addForm, court, coach_id: def?.coach_id || addForm.coach_id })
+                }} className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs">
                   <option value={1}>Court 1</option>
                   <option value={2}>Court 2</option>
                   <option value={3}>Court 3</option>
@@ -656,6 +679,15 @@ export default function ScheduleManager() {
                   <PlayerAutocomplete value={addPartner} onChange={setAddPartner} placeholder="e.g. Zain" />
                 </div>
               )}
+              {coaches.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-theme uppercase mb-1">Coach</label>
+                  <select value={addForm.coach_id || ''} onChange={e => setAddForm({ ...addForm, coach_id: e.target.value ? parseInt(e.target.value) : null })} className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs">
+                    <option value="">None</option>
+                    {coaches.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
             <div className="flex gap-3 mt-4">
               <button onClick={() => setAddSlot(null)} className="flex-1 py-2.5 rounded-xl bg-surface border border-theme text-theme text-sm font-semibold">Cancel</button>
@@ -666,7 +698,7 @@ export default function ScheduleManager() {
       )}
 
       {editSlot && (
-        <EditSlotModal slot={editSlot} onClose={() => setEditSlot(null)} onSaved={() => { setEditSlot(null); fetchSlots() }} />
+        <EditSlotModal slot={editSlot} onClose={() => setEditSlot(null)} onSaved={() => { setEditSlot(null); fetchSlots() }} coaches={coaches} courtDefaults={courtDefaults} />
       )}
 
       {balanceWarning && (
@@ -723,9 +755,9 @@ export default function ScheduleManager() {
   )
 }
 
-function EditSlotModal({ slot, onClose, onSaved }) {
+function EditSlotModal({ slot, onClose, onSaved, coaches, courtDefaults }) {
   const existingParts = (slot.player_text || '').split(/\s*\/\s*/)
-  const [form, setForm] = useState({ player_text: existingParts[0] || '', date: slot.date, time: slot.time, court: slot.court, session_type: slot.session_type || null })
+  const [form, setForm] = useState({ player_text: existingParts[0] || '', date: slot.date, time: slot.time, court: slot.court, session_type: slot.session_type || null, coach_id: slot.coach_id || null })
   const [partner, setPartner] = useState(existingParts[1] || '')
   const [loading, setLoading] = useState(false)
   const [pendingOverride, setPendingOverride] = useState(null)
@@ -816,12 +848,25 @@ function EditSlotModal({ slot, onClose, onSaved }) {
           </div>
           <div>
             <label className="block text-xs font-semibold text-theme uppercase mb-1">Court</label>
-            <select value={form.court} onChange={e => setForm({ ...form, court: parseInt(e.target.value) })} className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs">
+            <select value={form.court} onChange={e => {
+              const court = parseInt(e.target.value)
+              const def = courtDefaults?.find(cd => cd.court === court)
+              setForm({ ...form, court, coach_id: def?.coach_id || form.coach_id })
+            }} className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs">
               <option value={1}>Court 1</option>
               <option value={2}>Court 2</option>
               <option value={3}>Court 3</option>
             </select>
           </div>
+          {coaches && coaches.length > 0 && (
+            <div>
+              <label className="block text-xs font-semibold text-theme uppercase mb-1">Coach</label>
+              <select value={form.coach_id || ''} onChange={e => setForm({ ...form, coach_id: e.target.value ? parseInt(e.target.value) : null })} className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs">
+                <option value="">None</option>
+                {coaches.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          )}
         </div>
         <div className="flex gap-3 mt-4">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-surface border border-theme text-theme text-sm font-semibold">Cancel</button>

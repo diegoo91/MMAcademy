@@ -7,6 +7,17 @@ import { auditUpdate } from '../middleware/audit.js'
 
 const router = Router()
 
+// Cairo timezone helpers for today check
+function getCairoToday() {
+  const now = new Date()
+  const cairoStr = now.toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' })
+  return cairoStr
+}
+
+function isSlotDateFutureOrToday(dateStr) {
+  return dateStr >= getCairoToday()
+}
+
 // Valid slot statuses in order
 const STATUS = {
   AVAILABLE: 'available',
@@ -30,9 +41,43 @@ router.get('/', optionalAuth, (req, res) => {
     if (status) all = all.filter(s => s.status === status)
     if (visible_only === '1') all = all.filter(s => PLAYER_VISIBLE_STATUSES.includes(s.status))
     all.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time) || a.court - b.court)
-    res.json(all)
+
+    // Enrich slots with coach name
+    const coaches = db.findAll('users', u => u.role === 'coach')
+    const coachMap = new Map(coaches.map(c => [c.id, c.name]))
+    const enriched = all.map(s => ({ ...s, coach_name: s.coach_id ? coachMap.get(s.coach_id) || null : null }))
+
+    res.json(enriched)
   } catch (err) {
     console.error('List slots error:', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Court defaults — coach assigned per court (standing default)
+router.get('/court-defaults', (req, res) => {
+  try {
+    const defaults = db.findAll('court_defaults')
+    res.json(defaults)
+  } catch (err) {
+    console.error('Get court defaults error:', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+router.put('/court-defaults', requireRole('superadmin', 'admin'), (req, res) => {
+  try {
+    const { court, coach_id } = req.body
+    if (!court) return res.status(400).json({ error: 'court is required' })
+    const existing = db.find('court_defaults', cd => cd.court === parseInt(court))
+    if (existing) {
+      const updated = db.update('court_defaults', existing.id, { coach_id: coach_id || null })
+      return res.json(updated)
+    }
+    const created = db.insert('court_defaults', { court: parseInt(court), coach_id: coach_id || null })
+    res.json(created)
+  } catch (err) {
+    console.error('Update court defaults error:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -118,7 +163,7 @@ router.put('/:id', requireRole('superadmin', 'admin'), (req, res) => {
     const id = parseInt(req.params.id)
     const slot = db.get('slots', id)
     if (!slot) return res.status(404).json({ error: 'Slot not found' })
-    const { player_text, date, time, court, session_type, status, balanceOverride } = req.body
+    const { player_text, date, time, court, session_type, status, balanceOverride, coach_id } = req.body
     const err = validateLength('Player', player_text, LIMITS.playerText)
     if (err) return res.status(400).json({ error: err })
     const newDate = date || slot.date
@@ -131,6 +176,7 @@ router.put('/:id', requireRole('superadmin', 'admin'), (req, res) => {
       player_text: player_text ?? slot.player_text,
       date: newDate, time: newTime, court: newCourt,
       session_type: session_type !== undefined ? session_type : slot.session_type,
+      coach_id: coach_id !== undefined ? coach_id : slot.coach_id,
       status: status || slot.status,
     }
 
@@ -141,22 +187,21 @@ router.put('/:id', requireRole('superadmin', 'admin'), (req, res) => {
         updates.booking_id = null
         updates.user_id = null
       } else if (!slot.player_text?.trim() && player_text?.trim()) {
-        // Admin assigning a player to an empty slot — set confirmed + deduct balance
-        updates.status = STATUS.PLAYER_CONFIRMED
+        // Admin assigning a player to an empty slot
+        const stype = session_type || slot.session_type || 'private'
+        const isFuture = isSlotDateFutureOrToday(newDate)
+        updates.status = isFuture ? STATUS.SCHEDULE_APPROVED : STATUS.PLAYER_CONFIRMED
         const player = findPlayerUser(player_text)
         if (player) {
           updates.user_id = player.id
-          const stype = session_type || slot.session_type || 'private'
           const balanceInfo = getBalanceInfo(player)
-          const needed = stype === 'private' ? player.private_balance <= 0 : player.group_balance <= 0
-          if (needed && !balanceInfo[stype + '_balance']) {
-            // Balance insufficient
+          const hasEnough = (stype === 'private' && (player.private_balance || 0) > 0) ||
+                            (stype === 'group' && (player.group_balance || 0) > 0)
+          if (!hasEnough) {
             if (balanceOverride === 'free') {
-              // Bonus session — create slot confirmed, no deduction
+              // Bonus session — no deduction
             } else if (balanceOverride === 'deduct') {
-              // Allow negative balance
-              if (stype === 'private') db.update('users', player.id, { private_balance: (player.private_balance || 0) - 1 })
-              else db.update('users', player.id, { group_balance: (player.group_balance || 0) - 1 })
+              if (!isFuture) deductBalance(player.id, stype)
             } else {
               return res.status(409).json({
                 code: 'INSUFFICIENT_BALANCE',
@@ -167,23 +212,17 @@ router.put('/:id', requireRole('superadmin', 'admin'), (req, res) => {
               })
             }
           } else {
-            const ok = deductBalance(player.id, stype)
-            if (!ok) {
-              if (balanceOverride === 'free') {
-                // Bonus session — no deduction
-              } else if (balanceOverride === 'deduct') {
-                if (stype === 'private') db.update('users', player.id, { private_balance: (player.private_balance || 0) - 1 })
-                else db.update('users', player.id, { group_balance: (player.group_balance || 0) - 1 })
-              } else {
-                return res.status(409).json({
-                  code: 'INSUFFICIENT_BALANCE',
-                  player: player.name,
-                  sessionType: stype,
-                  remaining: balanceInfo[stype + '_balance'],
-                  needed: 1,
-                })
-              }
+            if (isFuture) {
+              // Future: deduct on player confirm (PUT /:id/confirm), not now
+            } else {
+              deductBalance(player.id, stype)
             }
+          }
+
+          if (isFuture) {
+            notifyUser(player.id, 'schedule_approved', 'Awaiting Your Confirmation',
+              `A ${stype} session on ${newDate} at ${newTime} (Court ${newCourt}) has been assigned to you. Please confirm your attendance.`,
+              '/profile')
           }
         }
       }
@@ -206,7 +245,7 @@ router.put('/:id', requireRole('superadmin', 'admin'), (req, res) => {
 // POST / — create slot (admin manual)
 router.post('/', requireRole('superadmin', 'admin'), (req, res) => {
   try {
-    const { date, time, court, player_text, session_type, balanceOverride } = req.body
+    const { date, time, court, player_text, session_type, balanceOverride, coach_id } = req.body
     if (!date || !time || !court) return res.status(400).json({ error: 'Date, time, and court are required' })
     const err = validateLength('Player', player_text, LIMITS.playerText)
     if (err) return res.status(400).json({ error: err })
@@ -225,8 +264,7 @@ router.post('/', requireRole('superadmin', 'admin'), (req, res) => {
           if (balanceOverride === 'free') {
             // Bonus session — create slot confirmed, no deduction
           } else if (balanceOverride === 'deduct') {
-            if (slotSessionType === 'private') db.update('users', player.id, { private_balance: (player.private_balance || 0) - 1 })
-            else db.update('users', player.id, { group_balance: (player.group_balance || 0) - 1 })
+            deductBalance(player.id, slotSessionType)
           } else {
             return res.status(409).json({
               code: 'INSUFFICIENT_BALANCE',
@@ -242,8 +280,7 @@ router.post('/', requireRole('superadmin', 'admin'), (req, res) => {
             if (balanceOverride === 'free') {
               // Bonus session — no deduction
             } else if (balanceOverride === 'deduct') {
-              if (slotSessionType === 'private') db.update('users', player.id, { private_balance: (player.private_balance || 0) - 1 })
-              else db.update('users', player.id, { group_balance: (player.group_balance || 0) - 1 })
+              deductBalance(player.id, slotSessionType)
             } else {
               return res.status(409).json({
                 code: 'INSUFFICIENT_BALANCE',
@@ -255,12 +292,20 @@ router.post('/', requireRole('superadmin', 'admin'), (req, res) => {
             }
           }
         }
-        const slot = db.insert('slots', { date, time, court, player_text, session_type: slotSessionType, status: STATUS.PLAYER_CONFIRMED, booking_id: null, user_id: player.id })
+        const slot = db.insert('slots', { date, time, court, player_text, session_type: slotSessionType, coach_id: coach_id || null, status: isSlotDateFutureOrToday(date) ? STATUS.SCHEDULE_APPROVED : STATUS.PLAYER_CONFIRMED, booking_id: null, user_id: player.id })
+
+        // Notify player for future/today slots (past slots are auto-confirmed, no notification)
+        if (isSlotDateFutureOrToday(date)) {
+          notifyUser(player.id, 'schedule_approved', 'Awaiting Your Confirmation',
+            `A ${slotSessionType} session on ${date} at ${time} (Court ${court}) has been assigned to you. Please confirm your attendance.`,
+            '/profile')
+        }
+
         return res.status(201).json(slot)
       }
     }
 
-    const slot = db.insert('slots', { date, time, court, player_text: player_text || '', session_type: hasPlayer ? slotSessionType : null, status: STATUS.AVAILABLE, booking_id: null })
+    const slot = db.insert('slots', { date, time, court, player_text: player_text || '', session_type: hasPlayer ? slotSessionType : null, coach_id: coach_id || null, status: STATUS.AVAILABLE, booking_id: null })
     res.status(201).json(slot)
   } catch (err) {
     console.error('Create slot error:', err)

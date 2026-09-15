@@ -72,7 +72,7 @@ router.get('/:id/sessions', (req, res) => {
       .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time))
       .map(s => {
         const booking = s.booking_id ? db.get('bookings', s.booking_id) : null
-        return { date: s.date, time: s.time, court: s.court, session_type: booking ? booking.session_type : null, paid: booking ? !!booking.paid : null, booking_ref: booking ? booking.ref : null }
+        return { date: s.date, time: s.time, court: s.court, session_type: s.session_type || (booking ? booking.session_type : null), paid: booking ? !!booking.paid : null, booking_ref: booking ? booking.ref : null, status: s.status }
       })
     res.json({ player: { id: player.id, full_name: player.name }, sessions })
   } catch (err) {

@@ -126,4 +126,42 @@ router.get('/summary', (req, res) => {
   }
 })
 
+// GET /coach-hours — superadmin only, total hours worked per coach over date range
+router.get('/coach-hours', requireRole('superadmin'), (req, res) => {
+  try {
+    const { from, to, preset } = req.query
+    let rangeFrom = from || null
+    let rangeTo = to || null
+    const now = new Date()
+    if (preset === 'week') {
+      const d = new Date(now); d.setDate(now.getDate() - 7); rangeFrom = d.toISOString().slice(0, 10); rangeTo = now.toISOString().slice(0, 10)
+    } else if (preset === 'month') {
+      const d = new Date(now); d.setMonth(now.getMonth() - 1); rangeFrom = d.toISOString().slice(0, 10); rangeTo = now.toISOString().slice(0, 10)
+    }
+
+    let allSlots = db.findAll('slots')
+    if (rangeFrom) allSlots = allSlots.filter(s => s.date >= rangeFrom)
+    if (rangeTo) allSlots = allSlots.filter(s => s.date <= rangeTo)
+
+    const coaches = db.findAll('users', u => u.role === 'coach')
+    const coachMap = new Map(coaches.map(c => [c.id, c.name]))
+
+    const hoursMap = {}
+    for (const s of allSlots) {
+      if (!s.coach_id) continue
+      const name = coachMap.get(s.coach_id) || `Coach #${s.coach_id}`
+      hoursMap[name] = (hoursMap[name] || 0) + 1
+    }
+
+    const coachHours = Object.entries(hoursMap)
+      .map(([name, hours]) => ({ name, hours }))
+      .sort((a, b) => b.hours - a.hours)
+
+    res.json({ coachHours, range: { from: rangeFrom, to: rangeTo, preset: preset || 'custom' } })
+  } catch (err) {
+    console.error('Coach hours report error:', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
 export default router

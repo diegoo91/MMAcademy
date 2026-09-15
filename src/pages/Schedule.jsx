@@ -155,8 +155,18 @@ export default function Schedule() {
   }, [slots, mineOnly, user, mySessionKeys, mySlotKeys])
 
   const weekDates = useMemo(() => {
-    return availableDates.slice(0, 5)
-  }, [availableDates])
+    const d = new Date(scheduleDate + 'T00:00:00')
+    const day = d.getDay()
+    const start = new Date(d)
+    start.setDate(d.getDate() - day)
+    const dates = []
+    for (let i = 0; i < 7; i++) {
+      const dd = new Date(start)
+      dd.setDate(start.getDate() + i)
+      dates.push(dd.toISOString().slice(0, 10))
+    }
+    return dates
+  }, [scheduleDate])
 
   return (
     <div className="min-h-screen bg-theme text-theme py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
@@ -314,6 +324,9 @@ export default function Schedule() {
                                     {slotObj.session_type === 'group' ? 'GRP' : 'PVT'}
                                   </span>
                                 )}
+                                {player && slotObj?.coach_name && (
+                                  <span className="text-[9px] font-bold text-amber-400">{slotObj.coach_name}</span>
+                                )}
                               </div>
                             )
                           })}
@@ -325,8 +338,8 @@ export default function Schedule() {
               </div>
             ) : (
               <div className="glass-panel rounded-3xl p-6 border border-theme overflow-x-auto mb-8">
-                <div className="min-w-[850px]">
-                  <div className="grid grid-cols-6 gap-3 pb-4 border-b border-theme text-center font-heading text-sm font-extrabold text-theme">
+                <div className="min-w-[950px]">
+                  <div className="grid grid-cols-8 gap-3 pb-4 border-b border-theme text-center font-heading text-sm font-extrabold text-theme">
                     <div className="text-left text-muted text-xs uppercase">Time Slot</div>
                     {weekDates.map(date => (
                       <div key={date} className="text-lime-400 text-xs">{getDayName(date)} ({formatDateShort(date)})</div>
@@ -334,7 +347,7 @@ export default function Schedule() {
                   </div>
                   <div className="divide-y divide-theme pt-2 space-y-2">
                     {weekTimes.map(time => (
-                      <div key={time} className="grid grid-cols-6 gap-3 py-2 items-center text-xs">
+                      <div key={time} className="grid grid-cols-8 gap-3 py-2 items-center text-xs">
                         <div className="font-bold text-theme font-mono flex items-center gap-1.5 text-[11px]">
                           <Clock className="w-3.5 h-3.5 text-lime-400" />
                           <span>{TIME_LABELS[time] || time}</span>
@@ -358,6 +371,11 @@ export default function Schedule() {
                               {empty ? 'Available' : (
                                 <span className="block">{[c1 && `C1: ${c1}`, c2 && `C2: ${c2}`, c3 && `C3: ${c3}`].filter(Boolean).join(' / ')}{isMine ? ' ★' : ''}</span>
                               )}
+                              {!empty && (() => {
+                                const allSlots = (slotsByDate.get(date) || []).filter(x => x.time === time)
+                                const coachNames = [...new Set(allSlots.map(x => x.coach_name).filter(Boolean))]
+                                return coachNames.length > 0 ? <span className="block text-[9px] text-amber-400 mt-0.5">{coachNames.join(', ')}</span> : null
+                              })()}
                             </div>
                           )
                         })}

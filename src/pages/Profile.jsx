@@ -134,12 +134,6 @@ export default function Profile() {
     setPwSaving(false)
   }
 
-  const confirmedCount = bookings.filter(b => b.status === 'player_confirmed').length
-  const pendingCount = bookings.filter(b => b.status === 'payment_pending' || b.status === 'payment_approved' || b.status === 'schedule_approved').length
-  const totalSessions = bookings.filter(b => b.status === 'player_confirmed').reduce((sum, b) => {
-    try { return sum + JSON.parse(b.sessions_json).length } catch { return sum }
-  }, 0)
-
   const totalPrivateRemaining = user.private_balance || 0
   const totalGroupRemaining = user.group_balance || 0
   const hasCredits = totalPrivateRemaining > 0 || totalGroupRemaining > 0
@@ -278,10 +272,10 @@ export default function Profile() {
         {/* Session Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { label: 'Total Bookings', value: bookings.length },
-            { label: 'Total Sessions', value: totalSessions },
-            { label: 'Confirmed', value: confirmedCount },
-            { label: 'Pending', value: pendingCount },
+            { label: 'Total Sessions', value: mySlots.length },
+            { label: 'Confirmed', value: mySlots.filter(s => s.status === 'player_confirmed').length },
+            { label: 'Awaiting Confirmation', value: mySlots.filter(s => s.status === 'schedule_approved').length },
+            { label: 'Pending', value: mySlots.filter(s => ['payment_pending', 'payment_approved'].includes(s.status)).length },
           ].map((stat, i) => (
             <div key={i} className="glass-card rounded-2xl p-5 text-center bg-white/60 dark:bg-slate-900/60">
               <div className="font-heading text-3xl font-black text-lime-400">{stat.value}</div>
@@ -301,8 +295,7 @@ export default function Profile() {
         )}
 
         {/* Session Credits */}
-        {(totalPrivateRemaining > 0 || totalGroupRemaining > 0) && (
-          <div className="glass-panel rounded-3xl border border-theme p-6 sm:p-8">
+        <div className="glass-panel rounded-3xl border border-theme p-6 sm:p-8">
             <h2 className="font-heading text-xl font-extrabold text-theme mb-4 flex items-center gap-2">
               <ArrowRightLeft className="w-5 h-5 text-purple-400" /> Remaining Session Credits
             </h2>
@@ -319,7 +312,6 @@ export default function Profile() {
             <p className="text-[11px] text-muted mt-3 text-center">1 Private session = 2 Group sessions.</p>
             <ConversionRequestButton privateRemaining={totalPrivateRemaining} groupRemaining={totalGroupRemaining} />
           </div>
-        )}
 
         {/* Booking History */}
         <div className="glass-panel rounded-3xl border border-theme p-6 sm:p-8">

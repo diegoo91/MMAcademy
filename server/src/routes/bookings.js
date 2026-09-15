@@ -67,6 +67,90 @@ router.get('/', (req, res) => {
   }
 })
 
+// GET /balance-check — check if player has enough balance for a booking
+router.get('/balance-check', (req, res) => {
+  try {
+    const { sessionType, count } = req.query
+    if (!sessionType || !count) return res.status(400).json({ error: 'sessionType and count required' })
+    const user = db.get('users', req.user.id)
+    if (!user) return res.status(404).json({ error: 'User not found' })
+    const n = parseInt(count) || 0
+    const priv = user.private_balance || 0
+    const grp = user.group_balance || 0
+    let hasEnough = false
+    if (sessionType === 'private') {
+      hasEnough = priv >= n
+    } else if (sessionType === 'group') {
+      // Group can be covered by group balance, or private balance (1 private = 2 group)
+      const effectiveGroup = grp + priv * 2
+      hasEnough = effectiveGroup >= n
+    }
+    res.json({ hasEnough, private_balance: priv, group_balance: grp, sessionType, count: n })
+  } catch (err) {
+    console.error('Balance check error:', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// POST /from-balance — book directly from balance (skip payment)
+router.post('/from-balance', (req, res) => {
+  try {
+    const { sessionType, sessions } = req.body
+    if (!sessionType || !sessions || !Array.isArray(sessions) || sessions.length === 0) {
+      return res.status(400).json({ error: 'Missing booking data' })
+    }
+
+    const user = db.get('users', req.user.id)
+    if (!user) return res.status(404).json({ error: 'User not found' })
+
+    // Verify sufficient balance
+    const n = sessions.length
+    const priv = user.private_balance || 0
+    const grp = user.group_balance || 0
+    let hasEnough = false
+    if (sessionType === 'private') {
+      hasEnough = priv >= n
+    } else if (sessionType === 'group') {
+      const effectiveGroup = grp + priv * 2
+      hasEnough = effectiveGroup >= n
+    }
+    if (!hasEnough) return res.status(409).json({ error: 'Insufficient balance' })
+
+    let ref = genRef()
+    while (db.find('bookings', b => b.ref === ref)) ref = genRef()
+
+    const booking = db.insert('bookings', {
+      ref, user_id: req.user.id, session_type: sessionType, mode: 'balance',
+      sessions_json: JSON.stringify(sessions), total: 0, status: STATUS.SCHEDULE_APPROVED,
+      player_name: req.user.name,
+    })
+
+    // Create schedule_approved slots (no payment step, player confirms)
+    for (const sess of sessions) {
+      const existingSlot = db.find('slots', s => s.date === sess.date && s.time === sess.time && s.court === sess.court)
+      if (!existingSlot) {
+        db.insert('slots', {
+          date: sess.date, time: sess.time, court: sess.court,
+          player_text: req.user.name, booking_id: booking.id,
+          user_id: req.user.id, session_type: sessionType, status: STATUS.SCHEDULE_APPROVED,
+        })
+      }
+    }
+
+    // Notify player to confirm
+    for (const sess of sessions) {
+      notify(req.user.id, 'schedule_approved', 'Awaiting Your Confirmation',
+        `Your ${sessionType} session on ${sess.date} at ${sess.time} (Court ${sess.court}) has been booked from your balance. Please confirm your attendance.`,
+        '/profile')
+    }
+
+    res.status(201).json({ booking, bookedFromBalance: true })
+  } catch (err) {
+    console.error('Book from balance error:', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
 // POST / — create booking + slots + payment (player pays in-app)
 router.post('/', (req, res) => {
   try {
