@@ -6,8 +6,16 @@ import { nanoid } from 'nanoid'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = join(__dirname, '..', 'data')
 const DB_PATH = join(DATA_DIR, 'academy.db.json')
+const OLD_DB_PATH = join(__dirname, '..', 'academy.db.json')
 
 if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true })
+
+// Migration: if data/academy.db.json doesn't exist but the old one does, copy it over
+if (!existsSync(DB_PATH) && existsSync(OLD_DB_PATH)) {
+  try {
+    writeFileSync(DB_PATH, readFileSync(OLD_DB_PATH, 'utf-8'))
+  } catch { /* ignore */ }
+}
 
 // NOTE: This JSON-file database does NOT persist across Railway redeploys on the free tier.
 // The file lives on an ephemeral container filesystem — data resets to seed state on each deploy.
@@ -34,6 +42,29 @@ function nextId(collection) {
 }
 
 function now() { return new Date().toISOString().replace('T', ' ').slice(0, 19) }
+
+// Seed coach users and court defaults if missing (needed after Railway redeploys)
+if (data.users.filter(u => u.role === 'coach').length === 0) {
+  const COACH_HASH = '$2a$10$7V27YSU20H7PcyNtbkrmOu7h1Vo09lDAXFEMWZQ73/y9DmVxIy9z2'
+  const ts = now()
+  const baseId = nextId('users')
+  const c1 = { id: baseId, name: 'Coach Laila', email: 'laila@mmpadel.com', phone: '', dob: '', role: 'coach', password_hash: COACH_HASH, is_claimed: true, skill_level: 'Advanced', notes: '', private_balance: 0, group_balance: 0, member_since: '2026', force_password_change: 0, member_code: String(baseId).padStart(3, '0'), created_at: ts, updated_at: ts }
+  const c2 = { id: baseId + 1, name: 'Coach Carlos', email: 'carlos@mmpadel.com', phone: '', dob: '', role: 'coach', password_hash: COACH_HASH, is_claimed: true, skill_level: 'Advanced', notes: '', private_balance: 0, group_balance: 0, member_since: '2026', force_password_change: 0, member_code: String(baseId + 1).padStart(3, '0'), created_at: ts, updated_at: ts }
+  data.users.push(c1, c2)
+  data.court_defaults = [{ id: 1, court: 1, coach_id: c1.id }, { id: 2, court: 2, coach_id: c2.id }, { id: 3, court: 3, coach_id: c1.id }]
+  save()
+}
+
+// Ensure Ahmed Saleh has correct balance (12 paid - 7 private - 2 group = 4 private / 0 group)
+// Only correct if clearly wrong (negative balances from the old deduction bug)
+const ahmed = data.users.find(u => u.id === 4)
+if (ahmed && (ahmed.private_balance < 0 || ahmed.group_balance < 0)) {
+  ahmed.private_balance = Math.max(ahmed.private_balance, 0)
+  ahmed.group_balance = Math.max(ahmed.group_balance, 0)
+  ahmed.balance_zero_since = null
+  ahmed.updated_at = now()
+  save()
+}
 
 const db = {
   save,

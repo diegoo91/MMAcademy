@@ -48,6 +48,9 @@ export default function Book() {
   const [mode, setMode] = useState('day')
   const [sessionType, setSessionType] = useState('')
   const [showFlyerModal, setShowFlyerModal] = useState(false)
+  const [balanceInfo, setBalanceInfo] = useState(null)
+  const [showSessionTypePicker, setShowSessionTypePicker] = useState(false)
+  const [bookingFromBalance, setBookingFromBalance] = useState(false)
 
   const [daySelectedDate, setDaySelectedDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [daySelections, setDaySelections] = useState(() => new Map())
@@ -79,7 +82,12 @@ export default function Book() {
       .finally(() => setLoadingSlots(false))
   }
 
-  useEffect(() => { fetchSlots() }, [])
+  useEffect(() => {
+    fetchSlots()
+    if (user) {
+      api.get('/slots/balance-check?sessionType=private&count=1').then(setBalanceInfo).catch(() => {})
+    }
+  }, [])
 
   const isTimeBooked = (date, time, court) => bookedMap.has(`${date}|${time}|${court}`)
 
@@ -138,9 +146,29 @@ export default function Book() {
       navigate('/login')
       return
     }
+    if (balanceInfo?.hasEnough) {
+      setShowSessionTypePicker(true)
+      return
+    }
     navigate('/payment', {
       state: { sessionType, mode, sessions: activeSessions, totalPrice, sessionCount },
     })
+  }
+
+  const handleBookFromBalance = async (bst) => {
+    if (!user) { navigate('/login'); return }
+    setBookingFromBalance(true)
+    try {
+      await api.post('/bookings/from-balance', {
+        sessionType: bst,
+        sessions: activeSessions.map(s => ({ date: s.date, time: s.time, court: s.court })),
+      })
+      setShowSessionTypePicker(false)
+      navigate('/profile')
+    } catch (err) {
+      alert(err.message || 'Failed to book from balance')
+    }
+    setBookingFromBalance(false)
   }
 
   return (
@@ -363,7 +391,7 @@ export default function Book() {
                   </div>
 
                   <button onClick={handleContinue} disabled={!canContinue} className="w-full py-4 rounded-2xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-extrabold text-sm shadow-xl shadow-lime-400/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50">
-                    <span>{user ? `Continue to Payment (${totalPrice.toLocaleString()} EGP)` : 'Login to Continue'}</span>
+                    <span>{user ? (balanceInfo?.hasEnough ? 'Book from Balance' : `Continue to Payment (${totalPrice.toLocaleString()} EGP)`) : 'Login to Continue'}</span>
                     <ArrowRight className="w-5 h-5" />
                   </button>
 
@@ -377,6 +405,44 @@ export default function Book() {
           </div>
         </div>
       </div>
+
+      {showSessionTypePicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-theme/85 backdrop-blur-md animate-fadeIn">
+          <div className="relative max-w-sm w-full bg-surface rounded-3xl overflow-hidden border border-theme p-6 shadow-2xl">
+            <h3 className="font-heading font-extrabold text-theme text-lg mb-2">Choose Session Type</h3>
+            <p className="text-xs text-muted mb-4">You have balance available. Which session type would you like to book?</p>
+            <div className="space-y-3">
+              {(user?.private_balance || 0) > 0 && (
+                <button onClick={() => handleBookFromBalance('private')} disabled={bookingFromBalance} className="w-full p-4 rounded-2xl bg-blue-400/10 border border-blue-400/30 text-left hover:bg-blue-400/20 transition-all disabled:opacity-50">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-theme text-sm">Private Session</span>
+                      <p className="text-[11px] text-muted mt-0.5">Balance: {user.private_balance} remaining</p>
+                    </div>
+                    <span className="text-blue-400 text-xs font-bold">1 available</span>
+                  </div>
+                </button>
+              )}
+              {(user?.group_balance || 0) > 0 && (
+                <button onClick={() => handleBookFromBalance('group')} disabled={bookingFromBalance} className="w-full p-4 rounded-2xl bg-purple-400/10 border border-purple-400/30 text-left hover:bg-purple-400/20 transition-all disabled:opacity-50">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-theme text-sm">Group Session</span>
+                      <p className="text-[11px] text-muted mt-0.5">Balance: {user.group_balance} remaining</p>
+                    </div>
+                    <span className="text-purple-400 text-xs font-bold">1 available</span>
+                  </div>
+                </button>
+              )}
+            </div>
+            <div className="flex gap-3 mt-4">
+              <button onClick={() => setShowSessionTypePicker(false)} className="flex-1 py-2.5 rounded-xl bg-surface border border-theme text-theme text-sm font-semibold">Cancel</button>
+              <button onClick={() => { setShowSessionTypePicker(false) }} className="flex-1 py-2.5 rounded-xl bg-surface border border-theme text-theme text-sm font-semibold">Pay Instead</button>
+            </div>
+            {bookingFromBalance && <p className="text-xs text-muted text-center mt-2">Booking...</p>}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
