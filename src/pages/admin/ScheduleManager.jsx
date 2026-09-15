@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Calendar as CalendarIcon, Check, Clock, Download, FileSpreadsheet, Plus, Trash2, Upload, X, ArrowRightLeft, Undo2, UserCheck } from 'lucide-react'
+import { Calendar as CalendarIcon, Check, Clock, Download, FileSpreadsheet, Plus, Trash2, Upload, X, ArrowRightLeft, Undo2, UserCheck, Settings } from 'lucide-react'
 import { api, downloadFile } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 
@@ -59,6 +59,8 @@ export default function ScheduleManager() {
   const [dayActionLoading, setDayActionLoading] = useState(null)
   const [coaches, setCoaches] = useState([])
   const [courtDefaults, setCourtDefaults] = useState([])
+  const [courtDefaultsDraft, setCourtDefaultsDraft] = useState({})
+  const [courtDefaultsSaving, setCourtDefaultsSaving] = useState(false)
 
   const fetchSlots = () => {
     setLoading(true)
@@ -85,7 +87,27 @@ export default function ScheduleManager() {
       const coachList = (Array.isArray(data) ? data : data.users || []).filter(u => u.role === 'coach')
       setCoaches(coachList)
     }).catch(() => {})
-    api.get('/slots/court-defaults').then(setCourtDefaults).catch(() => {})
+    api.get('/slots/court-defaults').then(defaults => {
+      setCourtDefaults(defaults)
+      const draft = {}
+      for (const d of defaults) draft[d.court] = d.coach_id || ''
+      setCourtDefaultsDraft(draft)
+    }).catch(() => {})
+  }
+
+  const saveCourtDefaults = async () => {
+    setCourtDefaultsSaving(true)
+    try {
+      const updates = [1, 2, 3].map(court => ({
+        court,
+        coach_id: courtDefaultsDraft[court] ? parseInt(courtDefaultsDraft[court]) : null,
+      }))
+      await Promise.all(updates.map(u => api.put('/slots/court-defaults', u)))
+      await fetchCoachesAndDefaults()
+    } catch (err) {
+      alert('Failed to save court defaults')
+    }
+    setCourtDefaultsSaving(false)
   }
 
   const checkPlayerBalance = (player) => {
@@ -346,6 +368,38 @@ export default function ScheduleManager() {
           </button>
         ))}
       </div>
+
+      {isSuperAdmin && coaches.length > 0 && (
+        <div className="glass-panel rounded-2xl border border-theme p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Settings className="w-4 h-4 text-lime-400" />
+            <h3 className="text-sm font-bold text-theme">Court Coach Defaults</h3>
+          </div>
+          <p className="text-[11px] text-muted mb-3">Default coach auto-fills when adding a slot to that court (overridable per slot).</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[1, 2, 3].map(court => (
+              <div key={court}>
+                <label className="block text-[10px] font-bold text-muted uppercase mb-1">Court {court}</label>
+                <select
+                  value={courtDefaultsDraft[court] || ''}
+                  onChange={e => setCourtDefaultsDraft({ ...courtDefaultsDraft, [court]: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-xs"
+                >
+                  <option value="">No default</option>
+                  {coaches.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={saveCourtDefaults}
+            disabled={courtDefaultsSaving}
+            className="mt-3 px-4 py-2 rounded-xl bg-lime-400 hover:bg-lime-300 text-slate-950 text-xs font-bold disabled:opacity-50"
+          >
+            {courtDefaultsSaving ? 'Saving...' : 'Save Defaults'}
+          </button>
+        </div>
+      )}
 
       {activeTab === 'schedule' && (
         <>
