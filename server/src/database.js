@@ -1,10 +1,13 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { nanoid } from 'nanoid'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const DB_PATH = join(__dirname, '..', 'academy.db.json')
+const DATA_DIR = join(__dirname, '..', 'data')
+const DB_PATH = join(DATA_DIR, 'academy.db.json')
+
+if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true })
 
 // NOTE: This JSON-file database does NOT persist across Railway redeploys on the free tier.
 // The file lives on an ephemeral container filesystem — data resets to seed state on each deploy.

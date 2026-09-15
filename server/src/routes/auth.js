@@ -23,7 +23,7 @@ function nextMemberCode() {
 }
 const ALLOWED_AVATAR = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const profileStorage = multer.diskStorage({
-  destination: join(__dirname, '..', '..', 'uploads'),
+  destination: join(__dirname, '..', '..', 'data', 'uploads'),
   filename: (req, file, cb) => cb(null, `avatar_${randomBytes(8).toString('hex')}${extname(file.originalname)}`)
 })
 const profileUpload = multer({

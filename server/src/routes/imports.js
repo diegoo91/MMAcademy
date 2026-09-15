@@ -18,7 +18,7 @@ function isSpreadsheet(file) {
 }
 
 const storage = multer.diskStorage({
-  destination: join(__dirname, '..', '..', 'uploads'),
+  destination: join(__dirname, '..', '..', 'data', 'uploads'),
   filename: (req, file, cb) => cb(null, `import_${randomBytes(8).toString('hex')}${extname(file.originalname)}`),
 })
 const upload = multer({
