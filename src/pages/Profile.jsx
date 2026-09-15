@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Camera, Clock, Mail, Phone, Shield, ArrowRightLeft, Calendar, Trophy, AlertTriangle, CheckCircle, XCircle, Key } from 'lucide-react'
+import { Camera, Clock, Mail, Phone, Shield, ArrowRightLeft, Calendar, Trophy, CheckCircle, XCircle, Key } from 'lucide-react'
 import { api, fileUrl } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 
@@ -33,9 +33,13 @@ export default function Profile() {
     to.setDate(today.getDate() + 30)
     api.get(`/slots?from=${from.toISOString().slice(0, 10)}&to=${to.toISOString().slice(0, 10)}`)
       .then(data => {
-        const mine = (Array.isArray(data) ? data : []).filter(s =>
-          s.user_id === user.id && ['schedule_approved', 'payment_pending', 'payment_approved'].includes(s.status)
-        )
+        const name = (user.name || '').toLowerCase()
+        const mine = (Array.isArray(data) ? data : []).filter(s => {
+          const matchesUser = s.user_id === user.id
+          const matchesName = name && s.player_text && s.player_text.split(/\s*\/\s*/)[0].trim().toLowerCase() === name
+          if (!matchesUser && !matchesName) return false
+          return ['schedule_approved', 'payment_pending', 'payment_approved', 'player_confirmed'].includes(s.status)
+        })
         setMySlots(mine)
       })
       .catch(() => {})
@@ -602,11 +606,12 @@ function MySlotsPanel({ slots, loading, onConfirm, onDecline }) {
   const scheduleApproved = slots.filter(s => s.status === 'schedule_approved')
   const paymentPending = slots.filter(s => s.status === 'payment_pending')
   const paymentApproved = slots.filter(s => s.status === 'payment_approved')
+  const playerConfirmed = slots.filter(s => s.status === 'player_confirmed')
 
   return (
     <div className="glass-panel rounded-3xl border border-theme p-6 sm:p-8">
       <h2 className="font-heading text-xl font-extrabold text-theme mb-4 flex items-center gap-2">
-        <AlertTriangle className="w-5 h-5 text-amber-400" /> Your Bookings — Action Needed
+        <Calendar className="w-5 h-5 text-lime-400" /> My Schedule
       </h2>
 
       {scheduleApproved.length > 0 && (
@@ -656,6 +661,18 @@ function MySlotsPanel({ slots, loading, onConfirm, onDecline }) {
           {paymentPending.map(slot => (
             <div key={slot.id} className="p-3 rounded-xl bg-amber-400/5 border border-amber-400/20 text-xs text-muted">
               {slot.date} at {slot.time} — Court {slot.court} — {slot.session_type || 'session'}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {playerConfirmed.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-bold text-emerald-400 uppercase">Confirmed Sessions ({playerConfirmed.length})</p>
+          {playerConfirmed.sort((a, b) => b.date.localeCompare(a.date)).map(slot => (
+            <div key={slot.id} className="p-3 rounded-xl bg-emerald-400/5 border border-emerald-400/20 text-xs text-muted flex justify-between items-center">
+              <span>{slot.date} at {slot.time} — Court {slot.court} — {slot.session_type || 'session'}</span>
+              <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             </div>
           ))}
         </div>

@@ -68,6 +68,18 @@ export default function Schedule() {
     return keys
   }, [myBookings])
 
+  const mySlotKeys = useMemo(() => {
+    if (!user) return new Set()
+    const keys = new Set()
+    const name = (user.name || '').toLowerCase()
+    if (!name) return keys
+    for (const s of slots) {
+      const playerName = (s.player_text || '').split(/\s*\/\s*/)[0].trim().toLowerCase()
+      if (playerName === name) keys.add(`${s.date}|${s.time}|${s.court}`)
+    }
+    return keys
+  }, [user, slots])
+
   const fetchSlots = () => {
     setLoading(true)
     setError('')
@@ -122,22 +134,25 @@ export default function Schedule() {
       }
     })
     if (mineOnly && user) {
-      return rows.filter(r => mySessionKeys.has(`${scheduleDate}|${r.time}|1`) || mySessionKeys.has(`${scheduleDate}|${r.time}|2`) || mySessionKeys.has(`${scheduleDate}|${r.time}|3`))
+      return rows.filter(r =>
+        mySlotKeys.has(`${scheduleDate}|${r.time}|1`) || mySlotKeys.has(`${scheduleDate}|${r.time}|2`) || mySlotKeys.has(`${scheduleDate}|${r.time}|3`)
+        || mySessionKeys.has(`${scheduleDate}|${r.time}|1`) || mySessionKeys.has(`${scheduleDate}|${r.time}|2`) || mySessionKeys.has(`${scheduleDate}|${r.time}|3`)
+      )
     }
     return rows
-  }, [scheduleDate, slotsByDate, mineOnly, user, mySessionKeys])
+  }, [scheduleDate, slotsByDate, mineOnly, user, mySessionKeys, mySlotKeys])
 
   const weekTimes = useMemo(() => {
     const set = new Set()
     for (const s of slots) {
       if (mineOnly && user) {
-        if (mySessionKeys.has(`${s.date}|${s.time}|${s.court}`)) set.add(s.time)
+        if (mySlotKeys.has(`${s.date}|${s.time}|${s.court}`) || mySessionKeys.has(`${s.date}|${s.time}|${s.court}`)) set.add(s.time)
       } else {
         set.add(s.time)
       }
     }
     return [...set].sort()
-  }, [slots, mineOnly, user, mySessionKeys])
+  }, [slots, mineOnly, user, mySessionKeys, mySlotKeys])
 
   const weekDates = useMemo(() => {
     return availableDates.slice(0, 5)
@@ -288,7 +303,7 @@ export default function Schedule() {
                            {[slot.slot1, slot.slot2, slot.slot3].map((slotObj, i) => {
                             const courtNum = i + 1
                             const player = slotObj?.player_text || ''
-                            const isMine = player && mySessionKeys.has(`${scheduleDate}|${slot.time}|${courtNum}`)
+                            const isMine = mySlotKeys.has(`${scheduleDate}|${slot.time}|${courtNum}`) || mySessionKeys.has(`${scheduleDate}|${slot.time}|${courtNum}`)
                             return (
                                <div key={i} className={`px-4 py-3 border-l border-theme text-xs font-bold text-center flex flex-col items-center justify-center gap-1 ${
                                 isMine ? 'bg-lime-400/15 text-lime-400' : 'bg-lime-400/5 text-lime-400'
@@ -333,7 +348,7 @@ export default function Schedule() {
                           const c2 = s2?.player_text || ''
                           const c3 = s3?.player_text || ''
                           const empty = !c1 && !c2 && !c3
-                          const isMine = mySessionKeys.has(`${date}|${time}|1`) || mySessionKeys.has(`${date}|${time}|2`) || mySessionKeys.has(`${date}|${time}|3`)
+                          const isMine = mySlotKeys.has(`${date}|${time}|1`) || mySlotKeys.has(`${date}|${time}|2`) || mySlotKeys.has(`${date}|${time}|3`) || mySessionKeys.has(`${date}|${time}|1`) || mySessionKeys.has(`${date}|${time}|2`) || mySessionKeys.has(`${date}|${time}|3`)
                           return (
                             <div key={date} className={`p-2.5 rounded-xl border text-[11px] font-bold text-center leading-snug ${
                               empty ? 'bg-surface text-muted border-theme'
