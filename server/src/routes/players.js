@@ -19,7 +19,7 @@ router.get('/', (req, res) => {
     const allSlots = db.findAll('slots')
     if (search) {
       const q = search.toLowerCase()
-      filtered = filtered.filter(p => (p.name || '').toLowerCase().includes(q) || p.email.toLowerCase().includes(q) || (p.phone && p.phone.includes(q)) || (p.member_code && p.member_code.includes(q)))
+      filtered = filtered.filter(p => (p.name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q) || (p.phone && p.phone.includes(q)) || (p.member_code && p.member_code.includes(q)))
     }
     if (skill) filtered = filtered.filter(p => p.skill_level === skill)
     filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))

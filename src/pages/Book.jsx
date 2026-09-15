@@ -83,12 +83,6 @@ export default function Book() {
 
   useEffect(() => { fetchSlots() }, [])
 
-  useEffect(() => {
-    if (!user) return
-    if (!sessionType || sessionCount === 0) { setBalanceInfo(null); return }
-    api.get(`/bookings/balance-check?sessionType=${sessionType}&count=${sessionCount}`).then(setBalanceInfo).catch(() => setBalanceInfo(null))
-  }, [user, sessionType, sessionCount])
-
   const isTimeBooked = (date, time, court) => bookedMap.has(`${date}|${time}|${court}`)
 
   const toggleDaySelection = (time, court) => {
@@ -140,6 +134,12 @@ export default function Book() {
   const sessionCount = activeSessions.length
   const totalPrice = calculatePrice(sessionType, sessionCount)
   const canContinue = sessionType && sessionCount > 0
+
+  useEffect(() => {
+    if (!user) return
+    if (!sessionType || sessionCount === 0) { setBalanceInfo(null); return }
+    api.get(`/bookings/balance-check?sessionType=${sessionType}&count=${sessionCount}`).then(setBalanceInfo).catch(() => setBalanceInfo(null))
+  }, [user, sessionType, sessionCount])
 
   const handleContinue = async () => {
     if (!user) { navigate('/login'); return }
