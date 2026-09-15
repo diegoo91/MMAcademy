@@ -58,8 +58,6 @@ export default function Schedule() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [balanceInfo, setBalanceInfo] = useState(null)
-  const [showSessionTypePicker, setShowSessionTypePicker] = useState(false)
-  const [bookingFromBalance, setBookingFromBalance] = useState(false)
   const mySessionKeys = useMemo(() => {
     const keys = new Set()
     for (const b of myBookings) {
@@ -103,36 +101,13 @@ export default function Schedule() {
     fetchSlots()
     if (user) {
       api.get('/bookings').then(data => setMyBookings(data.bookings || [])).catch(() => {})
-      api.get('/slots/balance-check?sessionType=private&count=1').then(setBalanceInfo).catch(() => {})
+      api.get('/bookings/balance-check?sessionType=private&count=1').then(setBalanceInfo).catch(() => {})
     }
   }, [user])
 
-  const handleBookFromBalance = async (sessionType) => {
-    if (!user) { navigate('/login'); return }
-    const availableSlots = slots.filter(s => s.status === 'available')
-    if (availableSlots.length === 0) { alert('No available slots to book.'); return }
-    const slot = availableSlots[0]
-    setBookingFromBalance(true)
-    try {
-      await api.post('/bookings/from-balance', {
-        sessionType,
-        sessions: [{ date: slot.date, time: slot.time, court: slot.court }],
-      })
-      setShowSessionTypePicker(false)
-      fetchSlots()
-    } catch (err) {
-      alert(err.message || 'Failed to book from balance')
-    }
-    setBookingFromBalance(false)
-  }
-
   const handleProceedToBook = () => {
     if (!user) { navigate('/login'); return }
-    if (balanceInfo?.hasEnough) {
-      setShowSessionTypePicker(true)
-    } else {
-      navigate('/book')
-    }
+    navigate('/book')
   }
 
   const slotsByDate = useMemo(() => groupSlotsByDate(slots), [slots])
@@ -430,49 +405,12 @@ export default function Schedule() {
             </div>
           </div>
           <button onClick={handleProceedToBook} className="px-6 py-3.5 rounded-2xl bg-lime-400 hover:bg-lime-300 text-slate-950 font-extrabold text-xs shadow-lg shadow-lime-400/20 transition-all flex items-center gap-2 shrink-0">
-            <span>{balanceInfo?.hasEnough ? 'Book from Balance' : 'Proceed to Book a Session'}</span>
+            <span>Proceed to Book a Session</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {showSessionTypePicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-theme/85 backdrop-blur-md animate-fadeIn">
-          <div className="relative max-w-sm w-full bg-surface rounded-3xl overflow-hidden border border-theme p-6 shadow-2xl">
-            <h3 className="font-heading font-extrabold text-theme text-lg mb-2">Choose Session Type</h3>
-            <p className="text-xs text-muted mb-4">You have balance available. Which session type would you like to book?</p>
-            <div className="space-y-3">
-              {(user?.private_balance || 0) > 0 && (
-                <button onClick={() => handleBookFromBalance('private')} disabled={bookingFromBalance} className="w-full p-4 rounded-2xl bg-blue-400/10 border border-blue-400/30 text-left hover:bg-blue-400/20 transition-all disabled:opacity-50">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="font-bold text-theme text-sm">Private Session</span>
-                      <p className="text-[11px] text-muted mt-0.5">Balance: {user.private_balance} remaining</p>
-                    </div>
-                    <span className="text-blue-400 text-xs font-bold">1 available</span>
-                  </div>
-                </button>
-              )}
-              {(user?.group_balance || 0) > 0 && (
-                <button onClick={() => handleBookFromBalance('group')} disabled={bookingFromBalance} className="w-full p-4 rounded-2xl bg-purple-400/10 border border-purple-400/30 text-left hover:bg-purple-400/20 transition-all disabled:opacity-50">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="font-bold text-theme text-sm">Group Session</span>
-                      <p className="text-[11px] text-muted mt-0.5">Balance: {user.group_balance} remaining</p>
-                    </div>
-                    <span className="text-purple-400 text-xs font-bold">1 available</span>
-                  </div>
-                </button>
-              )}
-            </div>
-            <div className="flex gap-3 mt-4">
-              <button onClick={() => setShowSessionTypePicker(false)} className="flex-1 py-2.5 rounded-xl bg-surface border border-theme text-theme text-sm font-semibold">Cancel</button>
-              <button onClick={() => { setShowSessionTypePicker(false); navigate('/book') }} className="flex-1 py-2.5 rounded-xl bg-surface border border-theme text-theme text-sm font-semibold">Pay Instead</button>
-            </div>
-            {bookingFromBalance && <p className="text-xs text-muted text-center mt-2">Booking...</p>}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

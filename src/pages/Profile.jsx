@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Camera, Clock, Mail, Phone, Shield, ArrowRightLeft, Calendar, Trophy, CheckCircle, XCircle, Key } from 'lucide-react'
 import { api, fileUrl } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
+import PlayerSearchInput from '../components/PlayerSearchInput'
 
 export default function Profile() {
   const { user, setUser } = useAuth()
@@ -534,8 +535,9 @@ function PlayerResultModal({ user, onClose, onSaved }) {
               <label className="block text-xs font-semibold text-lime-400 uppercase tracking-wider">Side A *</label>
               {form.sideA.map((name, i) => (
                 <div key={i} className="flex gap-1">
-                  <input type="text" value={name} onChange={e => updateSide('sideA', i, e.target.value)} required={i === 0} placeholder="Player name"
-                    className="flex-1 px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-sm focus:outline-none focus:border-lime-400" />
+                  <div className="flex-1">
+                    <PlayerSearchInput value={name} onChange={val => updateSide('sideA', i, val)} placeholder="Player name" />
+                  </div>
                   {form.sideA.length > 1 && <button type="button" onClick={() => removePlayer('sideA', i)} className="px-2 text-rose-400 hover:text-rose-300">&times;</button>}
                 </div>
               ))}
@@ -545,8 +547,9 @@ function PlayerResultModal({ user, onClose, onSaved }) {
               <label className="block text-xs font-semibold text-rose-400 uppercase tracking-wider">Side B *</label>
               {form.sideB.map((name, i) => (
                 <div key={i} className="flex gap-1">
-                  <input type="text" value={name} onChange={e => updateSide('sideB', i, e.target.value)} required={i === 0} placeholder="Opponent name"
-                    className="flex-1 px-3 py-2 rounded-xl bg-surface border border-theme text-theme text-sm focus:outline-none focus:border-lime-400" />
+                  <div className="flex-1">
+                    <PlayerSearchInput value={name} onChange={val => updateSide('sideB', i, val)} placeholder="Opponent name" />
+                  </div>
                   {form.sideB.length > 1 && <button type="button" onClick={() => removePlayer('sideB', i)} className="px-2 text-rose-400 hover:text-rose-300">&times;</button>}
                 </div>
               ))}
